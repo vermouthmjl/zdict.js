@@ -1,4 +1,5 @@
 import zDict from "./zdict.js";
+import pictures from "./data-pictures.js";
 
 let d = document.getElementById('learn-chars');
 
@@ -20,6 +21,7 @@ if (d.childElementCount === 0) d.innerHTML = '<div id="learn-toolbar"></div>' +
   '<div class="char-box kai">' +
   '<span class="char"></span><span class="num"></span></div>' +
   '</div>' +
+  '<div class="choices"></div>' +
   '<div class="meaning"></div>' +
   '<p class="source kai right"></p>' +
   '<div id="learn-settings"><p class="seal-line seal-top">密封线内不要答题</p>' +
@@ -55,6 +57,25 @@ tb.innerHTML || ['学习', '复习', '测验', '挑战'].forEach(function(el, i)
   '/><label for="mode-' + i + '" class="label">' + el + '</label> ';
 });
 var mode = 0;
+
+// 测验、挑战模式下的答题方式：0 打字、1 选拼音、2 看图选
+var answer = 0, NCHOICE = 4, picChars = Object.keys(pictures);
+var ab = d.querySelector('#learn-answer');
+if (!ab) {
+  ab = document.createElement('div');
+  ab.id = 'learn-answer';
+  tb.after(ab);
+}
+ab.innerHTML || ['打字', '选拼音', '看图选'].forEach(function(el, i) {
+  ab.innerHTML += '<input name="answer" type="radio" id="answer-' + i + '" ' +
+  (i === 0 ? 'checked' : '') + '/><label for="answer-' + i + '" class="label">' + el + '</label> ';
+});
+var ch = d.querySelector('.choices');
+if (!ch) {
+  ch = document.createElement('div');
+  ch.className = 'choices';
+  cb.after(ch);
+}
 
 // 浏览器的本地存储
 var S = {
@@ -119,8 +140,9 @@ setChars();
 // 按顺序显示一字及其相关信息
 function renderChar(char) {
   py.innerText = zi.innerText = mn.innerText = zi.nextElementSibling.innerText = '';
+  ch.innerHTML = '';
   if (mode != 3) sc.innerText = '';
-  py.setAttribute('contenteditable', true);
+  py[mode >= 2 && answer > 0 ? 'removeAttribute' : 'setAttribute']('contenteditable', true);
   cb.classList.remove('correct', 'wrong');
   var num;  // 挑战模式下的字符编号
   if (!char) {
@@ -148,16 +170,20 @@ function renderChar(char) {
 
       case 2:
         // 测验模式：依次测试全集拼音
-        if (p[2] >= chars.length - 1) {
+        var qChars = quizPool(chars);
+        if (qChars.length === 0) return noPicChars();
+        if (p[2] >= qChars.length - 1) {
           p[2] = -1;
           return alert('测验结束！');
         }
-        char = chars[++p[2]];
+        char = qChars[++p[2]];
         break;
 
       case 3:
         // 挑战模式：随机抽取一字测验
-        char = sampleOne(cChars);
+        var qChars = quizPool(cChars);
+        if (qChars.length === 0) return noPicChars();
+        char = sampleOne(qChars);
         cChars.splice(cChars.indexOf(char), 1);
         break;
     }
@@ -174,6 +200,7 @@ function renderPinyin(char, zi, py, sep) {
   var info = zDict.chars[char], pys = Object.keys(info);
   if (mode >= 2) {
     py.dataset.pinyin = pys.join(' - '); // 将正确拼音保存在数据中
+    if (answer > 0) return renderChoices(char);
     py.focus();
     // 如果拼音框在视窗外，则自动将它滚到视窗内
     var rect = py.getBoundingClientRect();
@@ -189,6 +216,69 @@ function renderMeaning(info) {
     me += `<p class="py">${k}</p><ol><li>${info[k].join('</li><li>')}</li></ol>`;
   };
   mn.innerHTML = me;
+}
+
+// 看图选模式下只考有图的字
+function quizPool(x) {
+  return answer === 2 ? x.filter(function(c) { return pictures[c]; }) : x;
+}
+function noPicChars() {
+  py.innerHTML = '<p style="font-size: .5em;">当前字库里没有可以看图的字了，请换个字库或答题方式</p>';
+}
+
+function pinyinOf(char) {
+  return Object.keys(zDict.chars[char]).join(' - ');
+}
+function shuffle(x) {
+  for (var i = x.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1)), t = x[i];
+    x[i] = x[j]; x[j] = t;
+  }
+  return x;
+}
+
+// 生成选择题：一个正确答案加几个不重复的干扰项
+function renderChoices(char) {
+  var label = answer === 1 ? pinyinOf : function(c) { return pictures[c]; },
+      pool = answer === 1 ? freqs : picChars, right = label(char), opts = [right];
+  for (var k = 0; opts.length < NCHOICE && k < 100; k++) {
+    var o = label(sampleOne(pool));
+    opts.indexOf(o) === -1 && opts.push(o);
+  }
+  shuffle(opts).forEach(function(o) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'choice' + (answer === 2 ? ' pic' : '');
+    b.innerText = o;
+    b.addEventListener('click', function(e) {
+      if (ch.classList.contains('done')) return;
+      ch.classList.add('done');
+      var ok = o === right;
+      b.classList.add(ok ? 'correct' : 'wrong');
+      ch.querySelectorAll('.choice').forEach(function(el) {
+        el.innerText === right && el.classList.add('correct');
+      });
+      gradeAnswer(ok, ok ? '' : answer === 1 ? o : '');
+      speak(char);
+      var nx = document.createElement('button');
+      nx.type = 'button';
+      nx.className = 'next';
+      nx.innerText = '下一个 ▶';
+      nx.addEventListener('click', function(e) { renderChar(); });
+      ch.appendChild(nx);
+    });
+    ch.appendChild(b);
+  });
+  ch.classList.remove('done');
+}
+
+// 读出字音（浏览器自带的语音合成）
+function speak(char) {
+  if (!window.speechSynthesis) return;
+  var u = new SpeechSynthesisUtterance(char);
+  u.lang = 'zh-CN';
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
 }
 
 // 初始随机显示一个字
@@ -211,6 +301,7 @@ function highlightReview() {
 function modeChange(e) {
   mode = +this.id.replace('mode-', '');
   d.classList[mode === 1 ? 'add' : 'remove']('review-pane');
+  d.classList[mode >= 2 ? 'add' : 'remove']('quiz-pane');
   d.classList.remove('review-all');
   renderChar();
 }
@@ -248,36 +339,56 @@ d.querySelectorAll('input[name="mode"]').forEach(function(el, i) {
 });
 
 // 测验
-var nw = 0;  // 挑战模式下的错字个数
+var nc = 0, nw = 0;  // 挑战模式下的已挑战字数、错字个数
 py.addEventListener('blur', function(e) {
-  // 非测试模式、或者已经结束测验的情况下提前退出
-  if (mode < 2 || (mode === 2 && p[2] === -1)) return;
+  // 非测试模式、选择题、或者已经结束测验的情况下提前退出
+  if (mode < 2 || answer > 0 || (mode === 2 && p[2] === -1)) return;
   var v = this.innerText, ans = this.dataset.pinyin;
   if (checkPinyin(v.trim(), ans)) {
-    cb.classList.add('correct');
-    this.innerText = ans;
+    gradeAnswer(true);
   } else {
-    if (mode !== 2 || !/^\s+$/.test(v)) cb.classList.add('wrong');
-    if (mode === 3) nw++;
-    v = v.trim();
-    this.innerText = v === '' ? ans : v + ' -> ' + ans;
+    gradeAnswer(false, v.trim(), mode === 2 && /^\s+$/.test(v));
     py.removeAttribute('contenteditable');
   };
-
   d.querySelector('input[id="mode-' + mode + '"]').focus();
-  if (mode === 3) {
-    renderMeaning(zDict.chars[zi.innerText]);
-    var N = freqs.length, nc = N - cChars.length;  // 已挑战样本量
-    if (nc >= 2) {
-      var m = 1 - nw/nc, s = 1.96 * Math.sqrt(N * (N - nc) / (nc - 1) * m * (1 - m));
-      var M = N * m, M1 = M - s, M2 = M + s;
-      if (M1 < 0) M1 = 0;
-      if (M2 > N) M2 = N;
-      M = Math.round(M); M1 = Math.round(M1); M2 = Math.round(M2);
-      sc.innerHTML = '已挑战 ' + nc + ' 字（错 ' + nw + ' 字）<br/>您的识字量估计为 '
-        + M + '，其 95% 近似置信区间为【' + M1 + '，' + M2 + '】';
-    }
+});
+
+// 判分：显示正确拼音；挑战模式下更新识字量估计
+function gradeAnswer(ok, given, quiet) {
+  var ans = py.dataset.pinyin;
+  py.innerText = ok || !given ? ans : given + ' -> ' + ans;
+  if (ok || !quiet) cb.classList.add(ok ? 'correct' : 'wrong');
+  if (mode !== 3) return;
+  nc++;
+  ok || nw++;
+  renderMeaning(zDict.chars[zi.innerText]);
+  if (answer === 2) {
+    sc.innerHTML = '已挑战 ' + nc + ' 字，答对 ' + (nc - nw) + ' 字';
+    return;
   }
+  if (nc < 2) return;
+  // 选拼音时有猜对的可能，按随机猜测的概率校正答对比例
+  var N = freqs.length, g = answer === 1 ? 1 / NCHOICE : 0, q = 1 - nw/nc;
+  var m = Math.max(0, (q - g) / (1 - g)),
+      s = 1.96 * Math.sqrt(N * (N - nc) / (nc - 1) * q * (1 - q)) / (1 - g);
+  var M = N * m, M1 = M - s, M2 = M + s;
+  if (M1 < 0) M1 = 0;
+  if (M2 > N) M2 = N;
+  M = Math.round(M); M1 = Math.round(M1); M2 = Math.round(M2);
+  sc.innerHTML = '已挑战 ' + nc + ' 字（错 ' + nw + ' 字）<br/>您的识字量估计为 '
+    + M + '，其 95% 近似置信区间为【' + M1 + '，' + M2 + '】';
+}
+
+// 切换答题方式：重新开始测验和挑战
+d.querySelectorAll('input[name="answer"]').forEach(function(el) {
+  el.addEventListener('change', function(e) {
+    answer = +this.id.replace('answer-', '');
+    p[2] = -1;
+    cChars = freqs.slice();
+    nc = nw = 0;
+    sc.innerText = '';
+    mode >= 2 && renderChar();
+  });
 });
 // 除了离开输入框，也可以用回车键提交答案
 ['keypress', 'keyup'].map(function(evt) {
