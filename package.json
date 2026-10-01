@@ -5,7 +5,7 @@
   "main": "js/zdict.js",
   "scripts": {
     "dev": "echo 'Open http://localhost:8000/dev/' && python3 -m http.server 8000",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/data.test.mjs test/game.test.mjs"
   },
   "repository": {
     "type": "git",
@@ -21,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/yihui/zdict.js/issues"
   },
-  "homepage": "https://github.com/yihui/zdict.js#readme"
+  "homepage": "https://github.com/yihui/zdict.js#readme",
+  "devDependencies": {
+    "puppeteer": "^23.11.1"
+  }
 }

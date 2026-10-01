@@ -69,3 +69,11 @@ HTML 页面上创建一个 `id` 为 `pinyin-finals` 的容器，然后即可结�
 注意本库中的 JS 源代码是以 JS 模块的方式写的，在发布到 NPM 之前上经过了
 [`rollup` 打包](.github/workflows/npm-publish.yml)，以便它们能同时在浏览器和
 Node 中使用。
+
+## 开发
+
+``` sh
+npm install    # 安装测试用的无头浏览器（puppeteer）
+npm run dev    # 本地预览识字应用：打开 http://localhost:8000/dev/
+npm test       # 在无头浏览器里测试图画数据和识字应用
+```

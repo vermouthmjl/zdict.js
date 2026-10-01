@@ -352,6 +352,8 @@ var nc = 0, nw = 0;  // 挑战模式下的已挑战字数、错字个数
 py.addEventListener('blur', function(e) {
   // 非测试模式、选择题、或者已经结束测验的情况下提前退出
   if (mode < 2 || answer > 0 || (mode === 2 && p[2] === -1)) return;
+  // 点答题方式按钮不算交卷
+  if (e.relatedTarget && ab.contains(e.relatedTarget)) return;
   var v = this.innerText, ans = this.dataset.pinyin;
   if (checkPinyin(v.trim(), ans)) {
     gradeAnswer(true);
@@ -396,12 +398,17 @@ function resetChallenge() {
 }
 
 // 切换答题方式：重新开始测验和挑战
+// 点按钮时尽量不抢走拼音输入框的焦点，抢走了就还回去，免得被当成交了白卷
+ab.addEventListener('mousedown', function(e) { e.preventDefault(); });
 d.querySelectorAll('input[name="answer"]').forEach(function(el) {
   el.addEventListener('change', function(e) {
     answer = +this.id.replace('answer-', '');
     p[2] = -1;
     resetChallenge();
     mode >= 2 && renderChar();
+  });
+  el.addEventListener('click', function(e) {
+    mode >= 2 && answer === 0 && py.isContentEditable && py.focus();
   });
 });
 // 除了离开输入框，也可以用回车键提交答案
