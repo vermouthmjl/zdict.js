@@ -66,10 +66,11 @@ if (!ab) {
   ab.id = 'learn-answer';
   tb.after(ab);
 }
-ab.innerHTML || ['打字', '选拼音', '看图选'].forEach(function(el, i) {
-  ab.innerHTML += '<input name="answer" type="radio" id="answer-' + i + '" ' +
-  (i === 0 ? 'checked' : '') + '/><label for="answer-' + i + '" class="label">' + el + '</label> ';
-});
+ab.innerHTML || (ab.innerHTML = '<span class="answer-title">答题方式</span><span class="segmented">' +
+  ['打字', '选拼音', '看图选'].map(function(el, i) {
+    return '<input name="answer" type="radio" id="answer-' + i + '" ' + (i === 0 ? 'checked' : '') +
+      '/><label for="answer-' + i + '">' + el + '</label>';
+  }).join('') + '</span>');
 var ch = d.querySelector('.choices');
 if (!ch) {
   ch = document.createElement('div');

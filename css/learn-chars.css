@@ -1,19 +1,50 @@
 #learn-toolbar, #learn-answer, .char-block { text-align: center; }
 .right { text-align: right; }
-#learn-toolbar .label, #learn-answer .label {
+#learn-toolbar .label {
   margin: auto 1em auto .5em;
   padding: .5em 1em;
 }
-#learn-toolbar input:not(:checked) + .label, #learn-answer input:not(:checked) + .label {
+#learn-toolbar input:not(:checked) + .label {
   background: none;
   border: 1px solid #eee;
 }
+#learn-toolbar { margin-bottom: 1em; }
 #learn-answer {
   display: none;
-  margin-top: 1em;
-  font-size: .9em;
+  margin-bottom: 1em;
+  font-size: .85em;
 }
-.quiz-pane #learn-answer { display: block; }
+.quiz-pane #learn-answer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .6em;
+}
+.answer-title { color: #888; }
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f0f0f0;
+}
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented label {
+  padding: .3em 1em;
+  border-radius: 999px;
+  color: #666;
+  cursor: pointer;
+}
+.segmented input:checked + label {
+  background: white;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+}
+.segmented input:focus-visible + label { outline: 2px solid #888; }
 .choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -51,7 +82,12 @@
   padding: .4em;
   cursor: pointer;
 }
-.pinyin { font-size: 3em; }
+.pinyin {
+  font-size: 3em;
+  min-height: 1.2em;
+  line-height: 1.2em;
+  margin-bottom: .2em;
+}
 .py {
   font-size: 1.5em;
   margin-bottom: auto;
