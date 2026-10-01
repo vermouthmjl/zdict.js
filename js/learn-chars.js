@@ -12,7 +12,7 @@ if (!d) {
 }
 
 // 学习字库、总字库、挑战字库
-var chars = [], freqs = zDict.freqs.split(''), cChars = freqs.slice();
+var chars = [], freqs = zDict.freqs.split(''), cChars = [];
 
 // 安插基本元素，用来存放拼音、汉字等信息
 if (d.childElementCount === 0) d.innerHTML = '<div id="learn-toolbar"></div>' +
@@ -132,6 +132,7 @@ function setChars() {
   if (n[1] < 0) n1.value = n[1] = 0;
   // 特例：如果设定总共使用 0 个字符，那么选择所有字符
   if (n[1] > 0) chars = chars.slice(n[0] - 1, n[0] - 1 + n[1]);
+  resetChallenge();
   S.remove(key2);
   d.querySelectorAll('.review').forEach(removeEl); // 重新生成复习字块
   mode === 1 && renderReview();
@@ -183,7 +184,7 @@ function renderChar(char) {
       case 3:
         // 挑战模式：随机抽取一字测验
         var qChars = quizPool(cChars);
-        if (qChars.length === 0) return noPicChars();
+        if (qChars.length === 0) return cChars.length ? noPicChars() : notice('范围内的字都挑战完了！');
         char = sampleOne(qChars);
         cChars.splice(cChars.indexOf(char), 1);
         break;
@@ -223,8 +224,11 @@ function renderMeaning(info) {
 function quizPool(x) {
   return answer === 2 ? x.filter(function(c) { return pictures[c]; }) : x;
 }
+function notice(msg) {
+  py.innerHTML = '<p style="font-size: .5em;">' + msg + '</p>';
+}
 function noPicChars() {
-  py.innerHTML = '<p style="font-size: .5em;">当前字库里没有可以看图的字了，请换个字库或答题方式</p>';
+  notice('当前字库里没有可以看图的字了，请换个字库或答题方式');
 }
 
 function pinyinOf(char) {
@@ -241,11 +245,15 @@ function shuffle(x) {
 // 生成选择题：一个正确答案加几个不重复的干扰项
 function renderChoices(char) {
   var label = answer === 1 ? pinyinOf : function(c) { return pictures[c]; },
-      pool = answer === 1 ? freqs : picChars, right = label(char), opts = [right];
-  for (var k = 0; opts.length < NCHOICE && k < 100; k++) {
-    var o = label(sampleOne(pool));
-    opts.indexOf(o) === -1 && opts.push(o);
-  }
+      right = label(char), opts = [right];
+  // 干扰项优先从设定的字符范围中选取，不够时再从全集中补足
+  [chars, answer === 1 ? freqs : picChars].forEach(function(pool) {
+    if (opts.length >= NCHOICE) return;
+    shuffle(quizPool(pool).slice()).forEach(function(c) {
+      var o = label(c);
+      opts.length < NCHOICE && opts.indexOf(o) === -1 && opts.push(o);
+    });
+  });
   shuffle(opts).forEach(function(o) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -369,15 +377,22 @@ function gradeAnswer(ok, given, quiet) {
   }
   if (nc < 2) return;
   // 选拼音时有猜对的可能，按随机猜测的概率校正答对比例
-  var N = freqs.length, g = answer === 1 ? 1 / NCHOICE : 0, q = 1 - nw/nc;
+  var N = chars.length, g = answer === 1 ? 1 / NCHOICE : 0, q = 1 - nw/nc;
   var m = Math.max(0, (q - g) / (1 - g)),
       s = 1.96 * Math.sqrt(N * (N - nc) / (nc - 1) * q * (1 - q)) / (1 - g);
   var M = N * m, M1 = M - s, M2 = M + s;
   if (M1 < 0) M1 = 0;
   if (M2 > N) M2 = N;
   M = Math.round(M); M1 = Math.round(M1); M2 = Math.round(M2);
-  sc.innerHTML = '已挑战 ' + nc + ' 字（错 ' + nw + ' 字）<br/>您的识字量估计为 '
+  sc.innerHTML = '已挑战 ' + nc + ' 字（错 ' + nw + ' 字）<br/>' +
+    (N === freqs.length ? '您的识字量估计为 ' : '所选 ' + N + ' 字中，您认识的字估计为 ')
     + M + '，其 95% 近似置信区间为【' + M1 + '，' + M2 + '】';
+}
+
+function resetChallenge() {
+  cChars = chars.slice();
+  nc = nw = 0;
+  sc.innerText = '';
 }
 
 // 切换答题方式：重新开始测验和挑战
@@ -385,9 +400,7 @@ d.querySelectorAll('input[name="answer"]').forEach(function(el) {
   el.addEventListener('change', function(e) {
     answer = +this.id.replace('answer-', '');
     p[2] = -1;
-    cChars = freqs.slice();
-    nc = nw = 0;
-    sc.innerText = '';
+    resetChallenge();
     mode >= 2 && renderChar();
   });
 });
@@ -402,4 +415,5 @@ d.querySelectorAll('input[name="answer"]').forEach(function(el) {
 ls.querySelector('#learn-set').addEventListener('click', function(e) {
   S.remove(key2);
   setChars();
+  renderChar();
 });
