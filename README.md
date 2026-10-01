@@ -74,6 +74,6 @@ Node 中使用。
 
 ``` sh
 npm install    # 安装测试用的无头浏览器（puppeteer）
-npm run dev    # 本地预览识字应用：打开 http://localhost:8000/dev/
+npm run dev    # 本地预览识字应用：打开 http://localhost:8000/
 npm test       # 在无头浏览器里测试图画数据和识字应用
 ```

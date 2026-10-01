@@ -4,7 +4,7 @@
   "description": "汉典网站数据（通用汉字、拼音、释义等）",
   "main": "js/zdict.js",
   "scripts": {
-    "dev": "echo 'Open http://localhost:8000/dev/' && python3 -m http.server 8000",
+    "dev": "echo 'Open http://localhost:8000/' && python3 -m http.server 8000",
     "test": "node --test test/data.test.mjs test/game.test.mjs"
   },
   "repository": {

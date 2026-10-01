@@ -7,7 +7,7 @@ import puppeteer from 'puppeteer';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 
-// 启动静态服务器和无头浏览器，测试页面为 dev/index.html
+// 启动静态服务器和无头浏览器，测试页面为根目录下的 index.html
 export async function setup() {
   const server = http.createServer((req, res) => {
     let file = path.join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -22,7 +22,7 @@ export async function setup() {
   const browser = await puppeteer.launch();
   return {
     browser,
-    url: `http://127.0.0.1:${server.address().port}/dev/`,
+    url: `http://127.0.0.1:${server.address().port}/`,
     async close() { await browser.close(); server.close(); }
   };
 }
