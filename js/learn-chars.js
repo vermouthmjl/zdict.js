@@ -254,19 +254,19 @@ function renderChoices(char) {
       opts.length < NCHOICE && opts.indexOf(o) === -1 && opts.push(o);
     });
   });
+  var rb;  // 正确答案的按钮
   shuffle(opts).forEach(function(o) {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'choice' + (answer === 2 ? ' pic' : '');
-    b.innerText = o;
+    b[answer === 2 ? 'innerHTML' : 'innerText'] = o;
+    if (o === right) rb = b;
     b.addEventListener('click', function(e) {
       if (ch.classList.contains('done')) return;
       ch.classList.add('done');
       var ok = o === right;
       b.classList.add(ok ? 'correct' : 'wrong');
-      ch.querySelectorAll('.choice').forEach(function(el) {
-        el.innerText === right && el.classList.add('correct');
-      });
+      rb.classList.add('correct');
       gradeAnswer(ok, ok ? '' : answer === 1 ? o : '');
       speak(char);
       var nx = document.createElement('button');

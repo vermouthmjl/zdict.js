@@ -1,5 +1,58 @@
-// 可以用图画表示意思的字，供不识字的小朋友看图答题；值为 emoji
-export default {
+// 可以用图画表示意思的字，供不识字的小朋友看图答题；值为 emoji 或内嵌 SVG
+// SVG 图中用橙色标出要看的东西，灰色的作参照
+const C = '#ff8c1a', G = '#c8c8c8', K = '#333';
+function svg(body) {
+  return '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' + body + '</svg>';
+}
+function dot(x, y, r, fill) {
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '"/>';
+}
+function rect(x, y, w, h, fill) {
+  return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3" fill="' + fill + '"/>';
+}
+function box(x, y, s) {
+  return '<rect x="' + x + '" y="' + y + '" width="' + s + '" height="' + s + '" fill="none" stroke="' + K + '" stroke-width="5"/>';
+}
+function arrow(x1, x2, y) {
+  return '<line x1="' + x1 + '" y1="' + y + '" x2="' + (x2 - 10) + '" y2="' + y + '" stroke="' + C + '" stroke-width="8"/>' +
+    '<polygon points="' + x2 + ',' + y + ' ' + (x2 - 14) + ',' + (y - 11) + ' ' + (x2 - 14) + ',' + (y + 11) + '" fill="' + C + '"/>';
+}
+// 左边一群散乱的点，右边两个点；多、少两字用颜色区分看哪一边
+function crowd(c1, c2) {
+  return [[12, 16], [31, 11], [52, 17], [22, 33], [42, 30], [60, 38], [9, 50], [28, 49],
+    [47, 53], [15, 68], [35, 66], [54, 72], [64, 57], [24, 85], [44, 84], [9, 86]]
+    .map(function(p) { return dot(p[0], p[1], 7, c1); }).join('') + dot(86, 40, 7, c2) + dot(86, 62, 7, c2);
+}
+
+// 金条：x 为左下角，y 为底边
+function goldBar(x, y) {
+  var s = ' stroke="#a87800" stroke-width="2" stroke-linejoin="round"/>';
+  return '<polygon points="' + [x, y, x + 42, y, x + 38, y - 14, x + 4, y - 14].join(',') + '" fill="#e8a800"' + s +
+    '<polygon points="' + [x + 4, y - 14, x + 38, y - 14, x + 33, y - 22, x + 9, y - 22].join(',') + '" fill="#ffd84a"' + s +
+    '<line x1="' + (x + 10) + '" y1="' + (y - 5) + '" x2="' + (x + 18) + '" y2="' + (y - 5) + '" stroke="#fff3b0" stroke-width="3" stroke-linecap="round"/>';
+}
+
+const svgs = {
+"金": svg(goldBar(6, 86) + goldBar(52, 86) + goldBar(29, 64) +
+  '<polygon points="82,14 85,24 95,27 85,30 82,40 79,30 69,27 79,24" fill="#f5b800"/>'),
+"中": svg(dot(18, 50, 13, G) + dot(50, 50, 13, C) + dot(82, 50, 13, G)),
+"大": svg(dot(38, 58, 32, C) + dot(85, 80, 10, G)),
+"小": svg(dot(38, 58, 32, G) + dot(85, 80, 10, C)),
+"多": svg(crowd(C, G)),
+"少": svg(crowd(G, C)),
+"高": svg(rect(22, 8, 24, 84, C) + rect(58, 62, 24, 30, G)),
+"长": svg(rect(8, 28, 84, 16, C) + rect(8, 60, 30, 16, G)),
+"出": svg(box(8, 30, 42) + arrow(29, 94, 51)),
+"入": svg(box(50, 30, 42) + arrow(6, 75, 51)),
+"内": svg(box(20, 20, 60) + dot(50, 50, 11, C)),
+"外": svg(box(8, 36, 56) + dot(82, 18, 11, C)),
+"半": svg('<circle cx="50" cy="50" r="36" fill="none" stroke="' + K + '" stroke-width="4"/>' +
+  '<path d="M50,14 A36,36 0 0,0 50,86 Z" fill="' + C + '"/>'),
+"土": svg('<path d="M4,86 Q50,14 96,86 Z" fill="#a0612d"/>' + dot(38, 66, 4, '#6b3e1a') +
+  dot(58, 56, 4, '#6b3e1a') + dot(66, 74, 4, '#6b3e1a') + '<line x1="0" y1="88" x2="100" y2="88" stroke="' + K + '" stroke-width="4"/>')
+};
+
+export default Object.assign(svgs, {
 "一": "1️⃣", "二": "2️⃣", "三": "3️⃣", "四": "4️⃣", "五": "5️⃣",
 "六": "6️⃣", "七": "7️⃣", "八": "8️⃣", "九": "9️⃣", "十": "🔟", "百": "💯",
 
@@ -31,8 +84,9 @@ export default {
 "床": "🛏️", "椅": "🪑", "衣": "👕", "帽": "🧢", "鞋": "👟", "袜": "🧦",
 "杯": "🥤", "碗": "🥣", "球": "⚽", "琴": "🎹", "鼓": "🥁", "钱": "💰",
 "信": "✉️", "剑": "🗡️", "箭": "🏹", "锁": "🔒", "钥": "🔑", "旗": "🚩",
-"房": "🏠", "桥": "🌉",
+"房": "🏠", "桥": "🌉", "家": "🏡", "店": "🏪", "城": "🏙️", "楼": "🏢",
+"路": "🛣️", "包": "🎒", "线": "🧵", "声": "🔊", "子": "🧒",
 
 "上": "⬆️", "下": "⬇️", "左": "⬅️", "右": "➡️",
 "红": "🟥", "黄": "🟨", "蓝": "🟦", "绿": "🟩", "白": "⬜", "黑": "⬛", "紫": "🟪"
-};
+});
