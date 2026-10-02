@@ -20,6 +20,7 @@ if (d.childElementCount === 0) d.innerHTML = '<div id="learn-toolbar"></div>' +
   '<div class="pinyin" contenteditable></div>' +
   '<div class="char-box kai">' +
   '<span class="char"></span><span class="num"></span></div>' +
+  '<span class="char-pic"></span>' +
   '</div>' +
   '<div class="choices"></div>' +
   '<div class="meaning"></div>' +
@@ -49,6 +50,14 @@ var tb = d.querySelector('#learn-toolbar'), cb = d.querySelector('.char-block'),
     py = cb.querySelector('.pinyin'), zi = cb.querySelector('.char'),
     mn = d.querySelector('.meaning'), sc = d.querySelector('.source'),
     ls = d.querySelector('#learn-settings'), lc = ls.querySelector('#learn-candidates');
+
+// 学习、复习模式下在字旁边显示图画（若有）
+var pc = cb.querySelector('.char-pic');
+if (!pc) {
+  pc = document.createElement('span');
+  pc.className = 'char-pic';
+  cb.appendChild(pc);
+}
 
 // 几种使用模式的单选框
 tb.innerHTML || ['学习', '复习', '测验', '挑战'].forEach(function(el, i) {
@@ -142,7 +151,7 @@ setChars();
 // 按顺序显示一字及其相关信息
 function renderChar(char) {
   py.innerText = zi.innerText = mn.innerText = zi.nextElementSibling.innerText = '';
-  ch.innerHTML = '';
+  ch.innerHTML = pc.innerHTML = '';
   if (mode != 3) sc.innerText = '';
   py[mode >= 2 && answer > 0 ? 'removeAttribute' : 'setAttribute']('contenteditable', true);
   cb.classList.remove('correct', 'wrong');
@@ -191,6 +200,8 @@ function renderChar(char) {
     }
   }
   if (mode === 1) highlightReview();
+  // 测验、挑战模式下不显示图画，免得泄露答案
+  if (mode < 2 && pictures[char]) pc.innerHTML = pictures[char];
   var info = renderPinyin(char, zi, py, ' - ');
   if (!info) return;
   renderMeaning(info);

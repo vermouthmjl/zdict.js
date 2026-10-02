@@ -113,6 +113,20 @@
     repeating-linear-gradient(135deg, transparent, transparent calc(50% - .5px), lightgray calc(50% - .5px), lightgray calc(50% + .5px));
   position: relative;
   line-height: 1em;
+  vertical-align: middle;
+}
+.char-pic {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 5em;
+  line-height: 1;
+  margin-left: .3em;
+}
+.char-pic:empty, .review .char-pic { display: none; }
+.char-pic svg {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
 }
 .char-box > .char + span {
   position: absolute;

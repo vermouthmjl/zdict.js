@@ -47,8 +47,8 @@ describe('learn-chars game', () => {
   it('grades typed pinyin, even after pressing the 打字 toggle', async () => {
     const page = await openPage(env);
     await choose(page, MODE.quiz, ANSWER.type);
-    const ans = await page.$eval('.char-block .pinyin', e => e.dataset.pinyin);
-    await page.click('.char-block .pinyin');
+    const ans = await page.$eval('.char-block:not(.review) .pinyin', e => e.dataset.pinyin);
+    await page.click('.char-block:not(.review) .pinyin');
     await page.keyboard.type(ans.split(' - ')[0]);
     await page.keyboard.press('Enter');
     const s = await state(page);
@@ -105,6 +105,33 @@ describe('learn-chars game', () => {
     await choose(page, MODE.quiz, ANSWER.picture);
     await setRange(page, '火水木山');
     assert.equal((await state(page)).char, '水');
+  });
+
+  it('shows the picture in learn and review modes but not in quizzes', async () => {
+    const page = await openPage(env);
+    const pic = () => page.$eval('.char-block:not(.review) > .char-pic', e => ({ html: e.innerHTML, shown: getComputedStyle(e).display !== 'none' }));
+    await setRange(page, '水人的');
+    // 按字频排序后依次为 人、的、水；“的”没有图
+    assert.equal((await state(page)).char, '人');
+    assert.ok((await pic()).shown);
+    await page.click('.char-block:not(.review) .char-box');
+    assert.equal((await state(page)).char, '的');
+    assert.equal((await pic()).shown, false);
+    await page.click('.char-block:not(.review) .char-box');
+    assert.equal((await pic()).html, '💧');
+    await choose(page, MODE.review);
+    const seen = {};
+    for (let i = 0; i < 3; i++) {
+      seen[(await state(page)).char] = (await pic()).shown;
+      await page.click('.char-block:not(.review) .char-box');
+    }
+    assert.deepEqual(seen, { '人': true, '的': false, '水': true });
+    assert.equal(await page.$$eval('.review .char-pic', es => es.filter(e => getComputedStyle(e).display !== 'none').length), 0);
+    for (const answer of [ANSWER.type, ANSWER.pinyin, ANSWER.picture]) {
+      await choose(page, MODE.quiz, answer);
+      assert.equal((await pic()).shown, false);
+    }
+    assert.deepEqual(page.errors, []);
   });
 
   it('keeps the character in place when the pinyin appears', async () => {

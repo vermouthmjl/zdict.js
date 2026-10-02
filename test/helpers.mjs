@@ -57,7 +57,7 @@ export function setRange(page, text, count = 20) {
 
 export function state(page) {
   return page.evaluate(() => {
-    const cb = document.querySelector('.char-block');
+    const cb = document.querySelector('.char-block:not(.review)');
     return {
       char: cb.querySelector('.char').innerText,
       pinyin: cb.querySelector('.pinyin').innerText,
@@ -75,9 +75,9 @@ export function question(page) {
     const pics = (await import('/js/data-pictures.js')).default;
     const t = document.createElement('div'), norm = h => (t.innerHTML = h, t.innerHTML);
     const cards = [...document.querySelectorAll('.choice')], pic = cards.some(e => e.classList.contains('pic'));
-    const char = document.querySelector('.char-block .char').innerText;
+    const char = document.querySelector('.char-block:not(.review) .char').innerText;
     const label = e => pic ? e.innerHTML : e.innerText;
-    const right = pic ? norm(pics[char]) : document.querySelector('.char-block .pinyin').dataset.pinyin;
+    const right = pic ? norm(pics[char]) : document.querySelector('.char-block:not(.review) .pinyin').dataset.pinyin;
     return { char, pic, options: cards.map(label), right };
   });
 }
