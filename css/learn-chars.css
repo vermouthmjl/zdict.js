@@ -189,3 +189,60 @@
   text-align: center;
   letter-spacing: 1em;
 }
+/* 练习模式：不能打字；进度圆点；结束页 */
+.practice-pane #answer-0 + label { display: none; }
+.practice-progress {
+  display: none;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .4em 1em;
+  margin-bottom: 1em;
+}
+.practice-pane .practice-progress:not(:empty) { display: flex; }
+.practice-over .practice-progress:not(:empty),
+.practice-over .char-block:not(.review) { display: none; }
+.pp {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: .2em .4em;
+  border-radius: .4em;
+  color: #888;
+}
+.pp .kai { font-size: 1.4em; line-height: 1.2; }
+.pp.now { color: #000; background: #f4f4f4; }
+.pp.done { color: forestgreen; }
+.pp .dots { display: inline-flex; gap: 3px; }
+.pp i {
+  width: .55em;
+  height: .55em;
+  border-radius: 50%;
+  border: 1px solid #bbb;
+}
+.pp i.on { background: forestgreen; border-color: forestgreen; }
+.practice-end { text-align: center; }
+.practice-end:empty { display: none; }
+.end-title { font-size: 1.6em; margin: .5em 0; }
+.end-chars {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .4em;
+}
+.end-chars button {
+  font: inherit;
+  font-size: 4em;
+  width: 1.4em;
+  height: 1.4em;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: .15em;
+  background: white;
+  cursor: pointer;
+}
+.practice-end .again {
+  font-size: 1.4em;
+  padding: .4em 1.5em;
+  margin: 1em 0;
+  cursor: pointer;
+}

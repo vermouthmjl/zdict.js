@@ -30,6 +30,8 @@ if (d.childElementCount === 0) d.innerHTML = '<div id="learn-toolbar"></div>' +
   '<p><span><span>字符范围：从第</span> <input type="number" value="1" min="1"> ' +
   '<span>字开始向后选取</span> <input type="number" value="20" min="0" step="10"> ' +
   '<span>字；韵母（可选）：<input type="text" class="yunmu"></span></span> ' +
+  '<span><span>练习：每轮</span> <input type="number" value="5" min="1"> ' +
+  '<span>字，每字答对</span> <input type="number" value="3" min="1"> <span>次</span></span> ' +
   '<button type="button" id="learn-set">确定</button></p>' +
   '<p class="seal-line seal-bottom">密封线内不要答题</p>';
 
@@ -60,7 +62,7 @@ if (!pc) {
 }
 
 // 几种使用模式的单选框
-tb.innerHTML || ['学习', '复习', '测验', '挑战'].forEach(function(el, i) {
+tb.innerHTML || ['学习', '复习', '测验', '挑战', '练习'].forEach(function(el, i) {
   tb.innerHTML += '<input name="mode" type="radio" id="mode-'+ i +
   '" ' + (i === 0 ? 'checked' : '') +
   '/><label for="mode-' + i + '" class="label">' + el + '</label> ';
@@ -87,6 +89,19 @@ if (!ch) {
   cb.after(ch);
 }
 
+// 练习模式下的进度条和结束页
+var pg = d.querySelector('.practice-progress'), pe = d.querySelector('.practice-end');
+if (!pg) {
+  pg = document.createElement('div');
+  pg.className = 'practice-progress';
+  cb.before(pg);
+}
+if (!pe) {
+  pe = document.createElement('div');
+  pe.className = 'practice-end';
+  ch.after(pe);
+}
+
 // 浏览器的本地存储
 var S = {
   "get": function(k) { return localStorage.getItem(k); },
@@ -111,6 +126,11 @@ function learnedChars(key) {
   var x = S.get(key);
   return x ? x.split('') : [];
 }
+
+// 练习模式：一轮练几个字（sChars），每字答对 sK 次算学会；
+// sQueue 是待答的字，sCount 记每字答对次数，sSeen 是已经看过字卡的字；
+// sStep：-1 未开始、0 看字卡、1 答题中、2 已答、3 一轮结束
+var key3 = 'mastered-chars', sChars = [], sQueue = [], sCount = {}, sSeen = [], sCur = '', sStep = -1, sK = 3;
 
 function setChars() {
   p = [-1, 0, -1];
@@ -150,11 +170,15 @@ setChars();
 
 // 按顺序显示一字及其相关信息
 function renderChar(char) {
+  // 练习模式下题目没答完或一轮已结束时，不换字
+  if (mode === 4 && !char && (sStep === 1 || sStep === 3)) return;
   py.innerText = zi.innerText = mn.innerText = zi.nextElementSibling.innerText = '';
   ch.innerHTML = pc.innerHTML = '';
   if (mode != 3) sc.innerText = '';
   py[mode >= 2 && answer > 0 ? 'removeAttribute' : 'setAttribute']('contenteditable', true);
   cb.classList.remove('correct', 'wrong');
+  d.classList.remove('practice-over');
+  pe.innerHTML = '';
   var num;  // 挑战模式下的字符编号
   if (!char) {
     switch (mode) {
@@ -197,12 +221,20 @@ function renderChar(char) {
         char = sampleOne(qChars);
         cChars.splice(cChars.indexOf(char), 1);
         break;
+
+      case 4:
+        // 练习模式：先看字卡，再答题，直到每个字都答对几次
+        char = nextPractice();
+        if (!char) return;
+        break;
     }
   }
   if (mode === 1) highlightReview();
   // 测验、挑战模式下不显示图画，免得泄露答案
-  if (mode < 2 && pictures[char]) pc.innerHTML = pictures[char];
+  var teach = mode === 4 && sStep === 0;
+  if ((mode < 2 || teach) && pictures[char]) pc.innerHTML = pictures[char];
   var info = renderPinyin(char, zi, py, ' - ');
+  if (mode === 4) return renderProgress(), teach && renderTeach(char);
   if (!info) return;
   renderMeaning(info);
   sc.innerHTML = '资料来源：汉典（<a href="https://www.zdic.net/hans/' + char + '" target="_blank">查看详情</a>）';
@@ -211,7 +243,7 @@ function renderPinyin(char, zi, py, sep) {
   zi.innerText = char;
   zi.nextElementSibling.innerText = freqs.indexOf(char) + 1;
   var info = zDict.chars[char], pys = Object.keys(info);
-  if (mode >= 2) {
+  if (mode >= 2 && !(mode === 4 && sStep === 0)) {
     py.dataset.pinyin = pys.join(' - '); // 将正确拼音保存在数据中
     if (answer > 0) return renderChoices(char);
     py.focus();
@@ -322,6 +354,15 @@ function modeChange(e) {
   mode = +this.id.replace('mode-', '');
   d.classList[mode === 1 ? 'add' : 'remove']('review-pane');
   d.classList[mode >= 2 ? 'add' : 'remove']('quiz-pane');
+  d.classList[mode === 4 ? 'add' : 'remove']('practice-pane');
+  // 练习模式只用选择题：打字换成选拼音，离开时再换回来
+  var a0 = ab.querySelector('#answer-0');
+  if (a0) {
+    a0.disabled = mode === 4;
+    if (mode === 4 && answer === 0) { setAnswer(1); typed = true; }
+    else if (mode !== 4 && typed) { setAnswer(0); typed = false; }
+  }
+  resetPractice();
   d.classList.remove('review-all');
   renderChar();
 }
@@ -384,6 +425,7 @@ function gradeAnswer(ok, given, quiet) {
   var ans = py.dataset.pinyin;
   py.innerText = ok || !given ? ans : given + ' -> ' + ans;
   if (ok || !quiet) cb.classList.add(ok ? 'correct' : 'wrong');
+  if (mode === 4) return gradePractice(ok);
   if (mode !== 3) return;
   nc++;
   ok || nw++;
@@ -410,16 +452,109 @@ function resetChallenge() {
   cChars = chars.slice();
   nc = nw = 0;
   sc.innerText = '';
+  resetPractice();
+}
+
+// 练习模式
+function resetPractice() {
+  sChars = []; sQueue = []; sCount = {}; sSeen = []; sCur = ''; sStep = -1;
+  pg.innerHTML = '';
+}
+function practiceNums() {
+  // 每轮字数、每字需答对的次数（设置区里的后两个数字框）
+  var ns = ls.querySelectorAll('input[type="number"]');
+  return [ns[2] ? Math.max(1, +ns[2].value || 5) : 5, ns[3] ? Math.max(1, +ns[3].value || 3) : 3];
+}
+function startPractice() {
+  var ms = learnedChars(key3), n = practiceNums();
+  sK = n[1];
+  sChars = quizPool(chars).filter(function(c) { return ms.indexOf(c) === -1; }).slice(0, n[0]);
+  sQueue = sChars.slice();
+  sChars.forEach(function(c) { sCount[c] = 0; });
+}
+// 下一步：看完字卡就答这个字，否则从队列里取下一个字（没见过的字先看字卡）
+function nextPractice() {
+  if (sStep === 0) return (sStep = 1, sCur);
+  if (sStep === -1) {
+    startPractice();
+    if (sChars.length === 0) {
+      sStep = 3;
+      return quizPool(chars).length ? notice('这些字都学会了，换一批字吧！') : noPicChars();
+    }
+  }
+  if (sQueue.length === 0) return endPractice();
+  sCur = sQueue.shift();
+  sStep = sSeen.indexOf(sCur) === -1 ? (sSeen.push(sCur), 0) : 1;
+  return sCur;
+}
+// 字卡：读出字音，点“开始”或点字进入答题
+function renderTeach(char) {
+  speak(char);
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'next';
+  b.innerText = '开始 ▶';
+  b.addEventListener('click', function(e) { renderChar(); });
+  ch.appendChild(b);
+}
+// 答对加一次；答错不扣分，只是让这个字隔一两题再出现
+function gradePractice(ok) {
+  var c = sCur;
+  sStep = 2;
+  if (!ok) {
+    sQueue.splice(Math.min(Math.random() < .5 ? 1 : 2, sQueue.length), 0, c);
+  } else if (++sCount[c] < sK) {
+    sQueue.push(c);
+  } else {
+    saveChar(c, key3);
+    saveChar(c, key2);
+  }
+  renderProgress();
+}
+// 每个字一排小圆点，答对一次点亮一个
+function renderProgress() {
+  pg.innerHTML = sChars.map(function(c) {
+    var dots = '';
+    for (var i = 0; i < sK; i++) dots += '<i' + (i < sCount[c] ? ' class="on"' : '') + '></i>';
+    return '<span class="pp' + (c === sCur ? ' now' : '') + (sCount[c] >= sK ? ' done' : '') +
+      '"><span class="kai">' + c + '</span><span class="dots">' + dots + '</span></span>';
+  }).join('');
+}
+// 一轮结束：列出学会的字，点字听读音；不自动开始下一轮
+function endPractice() {
+  sStep = 3;
+  d.classList.add('practice-over');
+  pe.innerHTML = '<p class="end-title">今天学会了</p><div class="end-chars kai"></div>';
+  var ec = pe.querySelector('.end-chars');
+  sChars.forEach(function(c) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.innerText = c;
+    b.addEventListener('click', function(e) { speak(c); });
+    ec.appendChild(b);
+  });
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'again';
+  b.innerText = '再来一轮 ▶';
+  b.addEventListener('click', function(e) { resetPractice(); renderChar(); });
+  pe.appendChild(b);
 }
 
 // 切换答题方式：重新开始测验和挑战
 // 点按钮时尽量不抢走拼音输入框的焦点，抢走了就还回去，免得被当成交了白卷
 ab.addEventListener('mousedown', function(e) { e.preventDefault(); });
+function setAnswer(i) {
+  ab.querySelector('#answer-' + i).checked = true;
+  answer = i;
+  p[2] = -1;
+  resetChallenge();
+}
+var typed = false;  // 进入练习模式时是否把打字换成了选拼音
 d.querySelectorAll('input[name="answer"]').forEach(function(el) {
   el.addEventListener('change', function(e) {
-    answer = +this.id.replace('answer-', '');
-    p[2] = -1;
-    resetChallenge();
+    setAnswer(+this.id.replace('answer-', ''));
+    typed = false;
     mode >= 2 && renderChar();
   });
   el.addEventListener('click', function(e) {
