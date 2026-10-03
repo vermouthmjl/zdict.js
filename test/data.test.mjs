@@ -37,6 +37,8 @@ describe('picture data', () => {
       const s = clozes[c], words = s.replace(/[_？！，]/g, '');
       assert.equal(s.split('_').length, 2, `${c}: ${s}`);
       assert.ok(words.length >= 2 && words.length <= 5, `${c}: ${s}`);
+      // 要填的字不能在短语里再出现，否则一眼就看出答案
+      assert.ok(!words.includes(c), `${c}: ${s}`);
       assert.deepEqual([...words].filter(x => !chars.includes(x)), [], `${c}: ${s}`);
     }
     assert.deepEqual(Object.keys(clozes).filter(c => emoji.includes(c)), []);
