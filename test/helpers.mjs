@@ -106,3 +106,16 @@ export function labelsOf(page, chars, pic) {
 export function topChars(page, n) {
   return page.evaluate(async n => (await import('/js/data-freqs.js')).default.slice(0, n), n);
 }
+
+// 填空卡里空格（及填进去的字）和旁边那个字的对齐情况：字的上下边、空框中线各差多少像素
+export function blankOffsets(page, sel) {
+  return page.evaluate(sel => {
+    const b = document.querySelector(sel + ' .blank'), t = b.previousSibling || b.nextSibling;
+    const g = document.createRange(), i = t === b.previousSibling ? t.length - 1 : 0;
+    g.setStart(t, i); g.setEnd(t, i + 1);
+    const n = g.getBoundingClientRect(), box = b.getBoundingClientRect(), mid = r => (r.top + r.bottom) / 2;
+    let a = null;
+    if (b.firstChild) { const h = document.createRange(); h.selectNodeContents(b); a = h.getBoundingClientRect(); }
+    return { top: a && a.top - n.top, bottom: a && a.bottom - n.bottom, box: mid(box) - mid(n) };
+  }, sel);
+}

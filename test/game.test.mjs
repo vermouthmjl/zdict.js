@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, openPage, choose, setRange, state, question, pick, next, labelsOf, topChars, MODE, ANSWER } from './helpers.mjs';
+import { setup, openPage, choose, setRange, state, question, pick, next, labelsOf, topChars, blankOffsets, MODE, ANSWER } from './helpers.mjs';
 
 describe('learn-chars game', () => {
   let env;
@@ -168,6 +168,20 @@ describe('learn-chars game', () => {
     assert.ok(asked.filter(c => cl.includes(c)).length >= 8, asked.join(''));
     assert.deepEqual(asked.filter(c => !top.includes(c)), []);
     assert.deepEqual(page.errors, []);
+  });
+
+  it('keeps the blank and its character on the line of the other characters', async () => {
+    const page = await openPage(env);
+    await page.setViewport({ width: 400, height: 900 });
+    const near = (o, msg) => {
+      for (const k of ['top', 'bottom', 'box']) if (o[k] !== null) assert.ok(Math.abs(o[k]) <= .6, `${msg} ${k} ${o[k]}`);
+    };
+    await setRange(page, '的');
+    near(await blankOffsets(page, '.char-pic .cloze'), 'learn');
+    await choose(page, MODE.quiz, ANSWER.picture);
+    near(await blankOffsets(page, '.choice .cloze'), 'empty');
+    await pick(page, true);
+    near(await blankOffsets(page, '.choice.correct .cloze'), 'answered');
   });
 
   it('keeps the character in place when the pinyin appears', async () => {

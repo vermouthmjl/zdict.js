@@ -85,12 +85,16 @@
   width: 1.1em;
   height: 1.1em;
   margin: 0 .08em;
+  /* 框和字按同一条基线对齐：行高等于框高，字就在框里居中，和旁边的字一样高 */
   line-height: 1.1em;
-  vertical-align: -.2em;
+  vertical-align: baseline;
+  text-align: center;
   border: .08em dashed #ff8c1a;
   border-radius: .15em;
   color: #ff8c1a;
 }
+/* 空框里放一个看不见的全角空格，让空框和填了字的框基线一样 */
+.cloze .blank:empty::before { content: "\3000"; }
 .cloze .blank:not(:empty) {
   border-style: solid;
   background: #fff3e6;
