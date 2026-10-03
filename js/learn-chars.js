@@ -1,5 +1,6 @@
 import zDict from "./zdict.js";
 import pictures from "./data-pictures.js";
+import clozes from "./data-cloze.js";
 
 let d = document.getElementById('learn-chars');
 
@@ -201,7 +202,10 @@ function renderChar(char) {
   }
   if (mode === 1) highlightReview();
   // 测验、挑战模式下不显示图画，免得泄露答案
-  if (mode < 2 && pictures[char]) pc.innerHTML = pictures[char];
+  if (mode < 2 && pictures[char]) {
+    pc.innerHTML = pictures[char];
+    fillBlank(pc, char);
+  }
   var info = renderPinyin(char, zi, py, ' - ');
   if (!info) return;
   renderMeaning(info);
@@ -235,6 +239,11 @@ function renderMeaning(info) {
 function quizPool(x) {
   return answer === 2 ? x.filter(function(c) { return pictures[c]; }) : x;
 }
+// 填空卡：把字填进空格里
+function fillBlank(el, char) {
+  var b = el.querySelector('.blank');
+  if (b) b.innerText = char;
+}
 function notice(msg) {
   py.innerHTML = '<p style="font-size: .5em;">' + msg + '</p>';
 }
@@ -256,9 +265,13 @@ function shuffle(x) {
 // 生成选择题：一个正确答案加几个不重复的干扰项
 function renderChoices(char) {
   var label = answer === 1 ? pinyinOf : function(c) { return pictures[c]; },
-      right = label(char), opts = [right];
+      right = label(char), opts = [right], pools = [chars, answer === 1 ? freqs : picChars];
+  // 看图选时干扰项先选同类（都是填空卡或都是图），免得一眼看出答案，不够时再混用
+  if (answer === 2) pools = pools.map(function(x) {
+    return x.filter(function(c) { return !clozes[c] === !clozes[char]; });
+  }).concat(pools);
   // 干扰项优先从设定的字符范围中选取，不够时再从全集中补足
-  [chars, answer === 1 ? freqs : picChars].forEach(function(pool) {
+  pools.forEach(function(pool) {
     if (opts.length >= NCHOICE) return;
     shuffle(quizPool(pool).slice()).forEach(function(c) {
       var o = label(c);
@@ -278,6 +291,7 @@ function renderChoices(char) {
       var ok = o === right;
       b.classList.add(ok ? 'correct' : 'wrong');
       rb.classList.add('correct');
+      fillBlank(rb, char);
       gradeAnswer(ok, ok ? '' : answer === 1 ? o : '');
       speak(char);
       var nx = document.createElement('button');
