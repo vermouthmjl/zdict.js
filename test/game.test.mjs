@@ -109,28 +109,64 @@ describe('learn-chars game', () => {
 
   it('shows the picture in learn and review modes but not in quizzes', async () => {
     const page = await openPage(env);
-    const pic = () => page.$eval('.char-block:not(.review) > .char-pic', e => ({ html: e.innerHTML, shown: getComputedStyle(e).display !== 'none' }));
-    await setRange(page, '水人的');
-    // 按字频排序后依次为 人、的、水；“的”没有图
+    const pic = () => page.$eval('.char-block:not(.review) > .char-pic', e => ({ html: e.innerHTML, text: e.innerText, shown: getComputedStyle(e).display !== 'none' }));
+    await setRange(page, '雨人也');
+    // 按字频排序后依次为 人、也、雨；“也”没有图
     assert.equal((await state(page)).char, '人');
     assert.ok((await pic()).shown);
     await page.click('.char-block:not(.review) .char-box');
-    assert.equal((await state(page)).char, '的');
+    assert.equal((await state(page)).char, '也');
     assert.equal((await pic()).shown, false);
     await page.click('.char-block:not(.review) .char-box');
-    assert.equal((await pic()).html, '💧');
+    assert.equal((await pic()).html, '🌧️');
     await choose(page, MODE.review);
     const seen = {};
     for (let i = 0; i < 3; i++) {
       seen[(await state(page)).char] = (await pic()).shown;
       await page.click('.char-block:not(.review) .char-box');
     }
-    assert.deepEqual(seen, { '人': true, '的': false, '水': true });
+    assert.deepEqual(seen, { '人': true, '也': false, '雨': true });
     assert.equal(await page.$$eval('.review .char-pic', es => es.filter(e => getComputedStyle(e).display !== 'none').length), 0);
     for (const answer of [ANSWER.type, ANSWER.pinyin, ANSWER.picture]) {
       await choose(page, MODE.quiz, answer);
       assert.equal((await pic()).shown, false);
     }
+    assert.deepEqual(page.errors, []);
+  });
+
+  it('shows fill-in-the-blank cards filled in when learning', async () => {
+    const page = await openPage(env);
+    await setRange(page, '的');
+    const p = await page.$eval('.char-block:not(.review) > .char-pic', e => ({
+      text: e.innerText, blank: e.querySelector('.cloze .blank').innerText
+    }));
+    assert.equal(p.text, '红红的苹果');
+    assert.equal(p.blank, '的');
+  });
+
+  it('asks fill-in-the-blank cards in 看图选, with only other cards as wrong answers', async () => {
+    const page = await openPage(env);
+    await setRange(page, '', 20);
+    await choose(page, MODE.quiz, ANSWER.picture);
+    const asked = [];
+    for (let i = 0; i < 25; i++) {
+      const q = await page.evaluate(async () => {
+        const cl = (await import('/js/data-cloze.js')).default;
+        const char = document.querySelector('.char-block:not(.review) .char').innerText;
+        return { char, cloze: !!cl[char], cards: [...document.querySelectorAll('.choice')].map(e => !!e.querySelector('.cloze')) };
+      });
+      if (!q.char || asked.includes(q.char)) break;
+      asked.push(q.char);
+      assert.equal(q.cards.length, 4);
+      assert.deepEqual(q.cards, [q.cloze, q.cloze, q.cloze, q.cloze], `question ${q.char}`);
+      await pick(page, true);
+      // 答对后正确的卡片填上了字
+      if (q.cloze) assert.equal(await page.$eval('.choice.correct .blank', e => e.innerText), q.char);
+      await next(page);
+    }
+    const top = await topChars(page, 20), cl = await page.evaluate(async () => Object.keys((await import('/js/data-cloze.js')).default));
+    assert.ok(asked.filter(c => cl.includes(c)).length >= 8, asked.join(''));
+    assert.deepEqual(asked.filter(c => !top.includes(c)), []);
     assert.deepEqual(page.errors, []);
   });
 
