@@ -38,7 +38,7 @@ export async function openPage(env) {
   return page;
 }
 
-export const MODE = { learn: 0, review: 1, quiz: 2, challenge: 3 };
+export const MODE = { learn: 0, review: 1, quiz: 2, challenge: 3, practice: 4 };
 export const ANSWER = { type: 0, pinyin: 1, picture: 2 };
 
 export async function choose(page, mode, answer) {
@@ -105,4 +105,33 @@ export function labelsOf(page, chars, pic) {
 
 export function topChars(page, n) {
   return page.evaluate(async n => (await import('/js/data-freqs.js')).default.slice(0, n), n);
+}
+
+// 练习模式：当前处在哪一步（字卡、答题、已答、结束），以及进度圆点
+export function practice(page) {
+  return page.evaluate(() => {
+    const d = document.querySelector('#learn-chars');
+    const stage = d.classList.contains('practice-over') ? 'end' :
+      !document.querySelector('.choice') ? (document.querySelector('.next') ? 'teach' : 'none') :
+      document.querySelector('.choices.done') ? 'answered' : 'ask';
+    return {
+      stage,
+      char: document.querySelector('.char-block:not(.review) .char').innerText,
+      progress: Object.fromEntries([...document.querySelectorAll('.practice-progress .pp')]
+        .map(e => [e.querySelector('.kai').innerText, e.querySelectorAll('i.on').length])),
+      ended: [...document.querySelectorAll('.end-chars button')].map(e => e.innerText)
+    };
+  });
+}
+
+// 练习模式走一步：字卡就点开始，答题就按 correct 作答，已答就点下一个
+export async function practiceStep(page, correct = true) {
+  const s = await practice(page);
+  if (s.stage === 'ask') return { ...s, picked: (await pick(page, correct)).char };
+  if (s.stage === 'teach' || s.stage === 'answered') await next(page);
+  return s;
+}
+
+export function storage(page, key) {
+  return page.evaluate(k => localStorage.getItem(k) || '', key);
 }

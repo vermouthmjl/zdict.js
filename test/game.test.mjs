@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, openPage, choose, setRange, state, question, pick, next, labelsOf, topChars, MODE, ANSWER } from './helpers.mjs';
+import { setup, openPage, choose, setRange, state, question, pick, next, labelsOf, topChars, practice, practiceStep, storage, MODE, ANSWER } from './helpers.mjs';
 
 describe('learn-chars game', () => {
   let env;
@@ -141,5 +141,166 @@ describe('learn-chars game', () => {
     const before = await top();
     await pick(page, true);
     assert.ok(Math.abs(await top() - before) < 1);
+  });
+
+  describe('practice mode', () => {
+    // 一直答到一轮结束，返回依次答过的字
+    async function finish(page, wrong = () => false) {
+      const asked = [];
+      for (let i = 0; i < 300; i++) {
+        const s = await practice(page);
+        if (s.stage === 'end') return asked;
+        const r = await practiceStep(page, !(s.stage === 'ask' && wrong(s.char, asked)));
+        if (r.picked) asked.push(r.picked);
+      }
+      throw new Error('session did not end');
+    }
+    async function start(page, answer) {
+      await choose(page, MODE.practice, answer);
+      await setRange(page, '', 20);
+    }
+
+    it('starts with a teaching card for the first of 5 chars from the range', async () => {
+      const page = await openPage(env);
+      await start(page);
+      const top = await topChars(page, 5), s = await practice(page);
+      assert.deepEqual(Object.keys(s.progress), [...top]);
+      assert.deepEqual(Object.values(s.progress), [0, 0, 0, 0, 0]);
+      assert.equal(s.stage, 'teach');
+      assert.equal(s.char, top[0]);
+      const st = await state(page);
+      assert.ok(st.pinyin.length > 0);
+      assert.equal(st.choices.length, 0);
+      await practiceStep(page);
+      assert.equal((await practice(page)).stage, 'ask');
+      assert.equal((await state(page)).pinyin, '');
+      assert.deepEqual(page.errors, []);
+    });
+
+    it('passes a char only after 3 right answers, interleaved, then lists them at the end', async () => {
+      const page = await openPage(env);
+      await start(page);
+      const top = [...await topChars(page, 5)], n = {};
+      let prev = '';
+      for (let i = 0; i < 100; i++) {
+        const s = await practice(page);
+        if (s.stage === 'end') break;
+        if (s.stage === 'ask') {
+          assert.equal(s.progress[s.char], n[s.char] || 0);
+          const left = Object.entries(s.progress).filter(([c, k]) => k < 3).length;
+          if (left > 1) assert.notEqual(s.char, prev, 'same char twice in a row');
+          prev = s.char;
+          n[s.char] = (n[s.char] || 0) + 1;
+          assert.ok(n[s.char] <= 3, `${s.char} asked after it passed`);
+          if (n[s.char] < 3) assert.ok(!(await storage(page, 'mastered-chars')).includes(s.char));
+        }
+        await practiceStep(page, true);
+      }
+      assert.deepEqual(Object.values(n), [3, 3, 3, 3, 3]);
+      const s = await practice(page);
+      assert.equal(s.stage, 'end');
+      assert.deepEqual(s.ended, top);
+      assert.match(await page.$eval('.practice-end', e => e.innerText), /今天学会了/);
+      assert.equal(await storage(page, 'mastered-chars'), top.join(''));
+      assert.equal(await storage(page, 'learned-chars'), top.join(''));
+      // 结束页不自动开始下一轮，点字也不会换页
+      await page.click('.char-block:not(.review) .char-box').catch(() => {});
+      await page.$eval('.end-chars button', e => e.click());
+      assert.equal((await practice(page)).stage, 'end');
+      assert.deepEqual(page.errors, []);
+    });
+
+    it('re-queues a wrong char 1-2 questions later without resetting its count', async () => {
+      const page = await openPage(env);
+      await start(page);
+      const [x] = await topChars(page, 1);
+      let wrongAt = -1;
+      const asked = await finish(page, (c, asked) => {
+        // x 第二次出现时答错一次
+        if (c === x && asked.filter(a => a === x).length === 1 && wrongAt < 0) return (wrongAt = asked.length, true);
+        return false;
+      });
+      assert.ok(wrongAt > 0);
+      const xs = asked.map((c, i) => c === x ? i : -1).filter(i => i >= 0);
+      assert.equal(xs.length, 4); // 对、错、对、对
+      const again = xs[xs.indexOf(wrongAt) + 1];
+      assert.ok(again - wrongAt >= 2 && again - wrongAt <= 3, `came back after ${again - wrongAt - 1} questions`);
+      assert.ok((await storage(page, 'mastered-chars')).includes(x));
+    });
+
+    it('keeps the count after a wrong answer', async () => {
+      const page = await openPage(env);
+      await start(page);
+      const [x] = await topChars(page, 1);
+      await practiceStep(page);                // 字卡
+      await practiceStep(page, true);          // 答对一次
+      for (let i = 0; i < 20; i++) {
+        const s = await practice(page);
+        if (s.stage === 'ask' && s.char === x) break;
+        await practiceStep(page, true);
+      }
+      await practiceStep(page, false);
+      const s = await practice(page);
+      assert.equal(s.stage, 'answered');
+      assert.equal(s.progress[x], 1);
+      const st = await state(page);
+      assert.match(st.block, /wrong/);
+      assert.equal(st.choices.filter(c => /correct/.test(c)).length, 1);
+    });
+
+    it('skips mastered chars in the next session', async () => {
+      const page = await openPage(env);
+      await start(page);
+      await finish(page);
+      await page.click('.practice-end .again');
+      const top = await topChars(page, 10), s = await practice(page);
+      assert.deepEqual(Object.keys(s.progress), [...top.slice(5)]);
+      assert.equal(s.stage, 'teach');
+    });
+
+    it('uses the session size and pass count from the settings', async () => {
+      const page = await openPage(env);
+      await choose(page, MODE.practice);
+      await page.evaluate(() => {
+        const ns = document.querySelectorAll('#learn-settings input[type=number]');
+        ns[2].value = 2; ns[3].value = 1;
+      });
+      await setRange(page, '', 20);
+      assert.equal(Object.keys((await practice(page)).progress).length, 2);
+      assert.equal((await finish(page)).length, 2);
+    });
+
+    it('offers no typing, and gives 打字 back when leaving', async () => {
+      const page = await openPage(env);
+      await choose(page, MODE.practice);
+      const ans = () => page.evaluate(() => ({
+        typeShown: getComputedStyle(document.querySelector('label[for=answer-0]')).display !== 'none',
+        typeDisabled: document.querySelector('#answer-0').disabled,
+        checked: document.querySelector('input[name=answer]:checked').id
+      }));
+      assert.deepEqual(await ans(), { typeShown: false, typeDisabled: true, checked: 'answer-1' });
+      await practiceStep(page);
+      assert.equal((await state(page)).choices.length, 4);
+      await choose(page, MODE.quiz);
+      assert.deepEqual(await ans(), { typeShown: true, typeDisabled: false, checked: 'answer-0' });
+      assert.deepEqual(page.errors, []);
+    });
+
+    it('practises only pictured chars with 看图选 and shows their pictures on the teaching card', async () => {
+      const page = await openPage(env);
+      await choose(page, MODE.practice, ANSWER.picture);
+      await setRange(page, '水人的');
+      const s = await practice(page);
+      assert.deepEqual(Object.keys(s.progress), ['人', '水']);
+      assert.ok(await page.$eval('.char-block:not(.review) > .char-pic', e => e.innerHTML.length > 0));
+      await practiceStep(page);
+      assert.equal(await page.$eval('.char-block:not(.review) > .char-pic', e => e.innerHTML), '');
+      await finish(page);
+      // 复习里只显示学会的字，“的”不算
+      await choose(page, MODE.review);
+      const shown = await page.$$eval('.review', es => es.filter(e => getComputedStyle(e).display !== 'none').map(e => e.querySelector('.char').innerText));
+      assert.deepEqual(shown, ['人', '水']);
+      assert.deepEqual(page.errors, []);
+    });
   });
 });
