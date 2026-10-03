@@ -107,12 +107,12 @@ export function topChars(page, n) {
   return page.evaluate(async n => (await import('/js/data-freqs.js')).default.slice(0, n), n);
 }
 
-// 练习模式：当前处在哪一步（字卡、答题、已答、结束），以及进度圆点
+// 练习模式：当前处在哪一步（答题、已答、结束），以及进度圆点
 export function practice(page) {
   return page.evaluate(() => {
     const d = document.querySelector('#learn-chars');
     const stage = d.classList.contains('practice-over') ? 'end' :
-      !document.querySelector('.choice') ? (document.querySelector('.next') ? 'teach' : 'none') :
+      !document.querySelector('.choice') ? 'none' :
       document.querySelector('.choices.done') ? 'answered' : 'ask';
     return {
       stage,
@@ -124,11 +124,11 @@ export function practice(page) {
   });
 }
 
-// 练习模式走一步：字卡就点开始，答题就按 correct 作答，已答就点下一个
+// 练习模式走一步：答题就按 correct 作答，已答就点下一个
 export async function practiceStep(page, correct = true) {
   const s = await practice(page);
   if (s.stage === 'ask') return { ...s, picked: (await pick(page, correct)).char };
-  if (s.stage === 'teach' || s.stage === 'answered') await next(page);
+  if (s.stage === 'answered') await next(page);
   return s;
 }
 

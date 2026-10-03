@@ -127,10 +127,9 @@ function learnedChars(key) {
   return x ? x.split('') : [];
 }
 
-// 练习模式：一轮练几个字（sChars），每字答对 sK 次算学会；
-// sQueue 是待答的字，sCount 记每字答对次数，sSeen 是已经看过字卡的字；
-// sStep：-1 未开始、0 看字卡、1 答题中、2 已答、3 一轮结束
-var key3 = 'mastered-chars', sChars = [], sQueue = [], sCount = {}, sSeen = [], sCur = '', sStep = -1, sK = 3;
+// 练习模式：一轮练几个字（sChars），每字答对 sK 次算学会；sCount 记每字答对次数；
+// sStep：-1 未开始、1 答题中、2 已答、3 一轮结束
+var key3 = 'mastered-chars', sChars = [], sCount = {}, sCur = '', sStep = -1, sK = 3;
 
 function setChars() {
   p = [-1, 0, -1];
@@ -223,7 +222,7 @@ function renderChar(char) {
         break;
 
       case 4:
-        // 练习模式：先看字卡，再答题，直到每个字都答对几次
+        // 练习模式：随机出题，直到每个字都答对几次
         char = nextPractice();
         if (!char) return;
         break;
@@ -231,10 +230,9 @@ function renderChar(char) {
   }
   if (mode === 1) highlightReview();
   // 测验、挑战模式下不显示图画，免得泄露答案
-  var teach = mode === 4 && sStep === 0;
-  if ((mode < 2 || teach) && pictures[char]) pc.innerHTML = pictures[char];
+  if (mode < 2 && pictures[char]) pc.innerHTML = pictures[char];
   var info = renderPinyin(char, zi, py, ' - ');
-  if (mode === 4) return renderProgress(), teach && renderTeach(char);
+  if (mode === 4) return renderProgress();
   if (!info) return;
   renderMeaning(info);
   sc.innerHTML = '资料来源：汉典（<a href="https://www.zdic.net/hans/' + char + '" target="_blank">查看详情</a>）';
@@ -243,7 +241,7 @@ function renderPinyin(char, zi, py, sep) {
   zi.innerText = char;
   zi.nextElementSibling.innerText = freqs.indexOf(char) + 1;
   var info = zDict.chars[char], pys = Object.keys(info);
-  if (mode >= 2 && !(mode === 4 && sStep === 0)) {
+  if (mode >= 2) {
     py.dataset.pinyin = pys.join(' - '); // 将正确拼音保存在数据中
     if (answer > 0) return renderChoices(char);
     py.focus();
@@ -457,7 +455,7 @@ function resetChallenge() {
 
 // 练习模式
 function resetPractice() {
-  sChars = []; sQueue = []; sCount = {}; sSeen = []; sCur = ''; sStep = -1;
+  sChars = []; sCount = {}; sCur = ''; sStep = -1;
   pg.innerHTML = '';
 }
 function practiceNums() {
@@ -469,12 +467,10 @@ function startPractice() {
   var ms = learnedChars(key3), n = practiceNums();
   sK = n[1];
   sChars = quizPool(chars).filter(function(c) { return ms.indexOf(c) === -1; }).slice(0, n[0]);
-  sQueue = sChars.slice();
   sChars.forEach(function(c) { sCount[c] = 0; });
 }
-// 下一步：看完字卡就答这个字，否则从队列里取下一个字（没见过的字先看字卡）
+// 下一题：从还没学会的字里随机抽一个，不连着两题考同一个字（只剩一个字时除外）
 function nextPractice() {
-  if (sStep === 0) return (sStep = 1, sCur);
   if (sStep === -1) {
     startPractice();
     if (sChars.length === 0) {
@@ -482,30 +478,17 @@ function nextPractice() {
       return quizPool(chars).length ? notice('这些字都学会了，换一批字吧！') : noPicChars();
     }
   }
-  if (sQueue.length === 0) return endPractice();
-  sCur = sQueue.shift();
-  sStep = sSeen.indexOf(sCur) === -1 ? (sSeen.push(sCur), 0) : 1;
-  return sCur;
+  var left = sChars.filter(function(c) { return sCount[c] < sK; });
+  if (left.length === 0) return endPractice();
+  if (left.length > 1) left = left.filter(function(c) { return c !== sCur; });
+  sStep = 1;
+  return sCur = sampleOne(left);
 }
-// 字卡：读出字音，点“开始”或点字进入答题
-function renderTeach(char) {
-  speak(char);
-  var b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'next';
-  b.innerText = '开始 ▶';
-  b.addEventListener('click', function(e) { renderChar(); });
-  ch.appendChild(b);
-}
-// 答对加一次；答错不扣分，只是让这个字隔一两题再出现
+// 答对加一次，答错不扣分；答够次数就算学会
 function gradePractice(ok) {
   var c = sCur;
   sStep = 2;
-  if (!ok) {
-    sQueue.splice(Math.min(Math.random() < .5 ? 1 : 2, sQueue.length), 0, c);
-  } else if (++sCount[c] < sK) {
-    sQueue.push(c);
-  } else {
+  if (ok && ++sCount[c] >= sK) {
     saveChar(c, key3);
     saveChar(c, key2);
   }

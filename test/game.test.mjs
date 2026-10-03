@@ -160,21 +160,30 @@ describe('learn-chars game', () => {
       await setRange(page, '', 20);
     }
 
-    it('starts with a teaching card for the first of 5 chars from the range', async () => {
+    it('asks 5 chars from the range straight away, without showing the picture first', async () => {
       const page = await openPage(env);
       await start(page);
       const top = await topChars(page, 5), s = await practice(page);
       assert.deepEqual(Object.keys(s.progress), [...top]);
       assert.deepEqual(Object.values(s.progress), [0, 0, 0, 0, 0]);
-      assert.equal(s.stage, 'teach');
-      assert.equal(s.char, top[0]);
+      assert.equal(s.stage, 'ask');
+      assert.ok(top.includes(s.char));
       const st = await state(page);
-      assert.ok(st.pinyin.length > 0);
-      assert.equal(st.choices.length, 0);
-      await practiceStep(page);
-      assert.equal((await practice(page)).stage, 'ask');
-      assert.equal((await state(page)).pinyin, '');
+      assert.equal(st.pinyin, '');
+      assert.equal(st.choices.length, 4);
+      assert.equal(await page.$eval('.char-block:not(.review) > .char-pic', e => e.innerHTML), '');
       assert.deepEqual(page.errors, []);
+    });
+
+    it('asks in random order', async () => {
+      // 6 轮的第一题都相同的概率只有 (1/5)^5
+      const firsts = new Set();
+      for (let i = 0; i < 6; i++) {
+        const page = await openPage(env);
+        await start(page);
+        firsts.add((await practice(page)).char);
+      }
+      assert.ok(firsts.size > 1, 'first question was always ' + [...firsts]);
     });
 
     it('passes a char only after 3 right answers, interleaved, then lists them at the end', async () => {
@@ -201,8 +210,10 @@ describe('learn-chars game', () => {
       assert.equal(s.stage, 'end');
       assert.deepEqual(s.ended, top);
       assert.match(await page.$eval('.practice-end', e => e.innerText), /今天学会了/);
-      assert.equal(await storage(page, 'mastered-chars'), top.join(''));
-      assert.equal(await storage(page, 'learned-chars'), top.join(''));
+      // 按学会的先后保存，顺序随机，所以只比较集合
+      const sorted = async k => [...await storage(page, k)].sort();
+      assert.deepEqual(await sorted('mastered-chars'), [...top].sort());
+      assert.deepEqual(await sorted('learned-chars'), [...top].sort());
       // 结束页不自动开始下一轮，点字也不会换页
       await page.click('.char-block:not(.review) .char-box').catch(() => {});
       await page.$eval('.end-chars button', e => e.click());
@@ -210,35 +221,17 @@ describe('learn-chars game', () => {
       assert.deepEqual(page.errors, []);
     });
 
-    it('re-queues a wrong char 1-2 questions later without resetting its count', async () => {
-      const page = await openPage(env);
-      await start(page);
-      const [x] = await topChars(page, 1);
-      let wrongAt = -1;
-      const asked = await finish(page, (c, asked) => {
-        // x 第二次出现时答错一次
-        if (c === x && asked.filter(a => a === x).length === 1 && wrongAt < 0) return (wrongAt = asked.length, true);
-        return false;
-      });
-      assert.ok(wrongAt > 0);
-      const xs = asked.map((c, i) => c === x ? i : -1).filter(i => i >= 0);
-      assert.equal(xs.length, 4); // 对、错、对、对
-      const again = xs[xs.indexOf(wrongAt) + 1];
-      assert.ok(again - wrongAt >= 2 && again - wrongAt <= 3, `came back after ${again - wrongAt - 1} questions`);
-      assert.ok((await storage(page, 'mastered-chars')).includes(x));
-    });
-
     it('keeps the count after a wrong answer', async () => {
       const page = await openPage(env);
       await start(page);
       const [x] = await topChars(page, 1);
-      await practiceStep(page);                // 字卡
-      await practiceStep(page, true);          // 答对一次
-      for (let i = 0; i < 20; i++) {
+      // 先把 x 答对一次，等它再出现时答错
+      for (let i = 0; i < 60; i++) {
         const s = await practice(page);
-        if (s.stage === 'ask' && s.char === x) break;
+        if (s.stage === 'ask' && s.char === x && s.progress[x] === 1) break;
         await practiceStep(page, true);
       }
+      assert.equal((await practice(page)).char, x);
       await practiceStep(page, false);
       const s = await practice(page);
       assert.equal(s.stage, 'answered');
@@ -255,7 +248,7 @@ describe('learn-chars game', () => {
       await page.click('.practice-end .again');
       const top = await topChars(page, 10), s = await practice(page);
       assert.deepEqual(Object.keys(s.progress), [...top.slice(5)]);
-      assert.equal(s.stage, 'teach');
+      assert.equal(s.stage, 'ask');
     });
 
     it('uses the session size and pass count from the settings', async () => {
@@ -279,21 +272,18 @@ describe('learn-chars game', () => {
         checked: document.querySelector('input[name=answer]:checked').id
       }));
       assert.deepEqual(await ans(), { typeShown: false, typeDisabled: true, checked: 'answer-1' });
-      await practiceStep(page);
       assert.equal((await state(page)).choices.length, 4);
       await choose(page, MODE.quiz);
       assert.deepEqual(await ans(), { typeShown: true, typeDisabled: false, checked: 'answer-0' });
       assert.deepEqual(page.errors, []);
     });
 
-    it('practises only pictured chars with 看图选 and shows their pictures on the teaching card', async () => {
+    it('practises only pictured chars with 看图选, never showing the picture beside the char', async () => {
       const page = await openPage(env);
       await choose(page, MODE.practice, ANSWER.picture);
       await setRange(page, '水人的');
       const s = await practice(page);
       assert.deepEqual(Object.keys(s.progress), ['人', '水']);
-      assert.ok(await page.$eval('.char-block:not(.review) > .char-pic', e => e.innerHTML.length > 0));
-      await practiceStep(page);
       assert.equal(await page.$eval('.char-block:not(.review) > .char-pic', e => e.innerHTML), '');
       await finish(page);
       // 复习里只显示学会的字，“的”不算
