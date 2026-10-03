@@ -123,6 +123,13 @@ function seesaw(heavy, light) {
     rect(12, 23, 30, 30, heavy, 3) + rect(70, 41, 12, 12, light, 2) + '</g>');
 }
 
+// 这、那：灰色小人指着近处或远处的球
+function point(near) {
+  return svg(line(0, 92, 100, 92, G, 3) + person(16, 70, false, G) +
+    (near ? line(21, 46, 36, 64, G, 5) : line(21, 46, 44, 40, G, 5)) +
+    dot(46, 78, 13, near ? C : G) + dot(85, 50, 9, near ? G : C));
+}
+
 export default {
 "金": metal('gold'),
 "银": metal('silver'),
@@ -194,5 +201,8 @@ export default {
 "胸": body('chest'),
 "肚": body('belly'),
 "腰": body('waist'),
-"身": body('all')
+"身": body('all'),
+
+"这": point(true),
+"那": point(false)
 };
