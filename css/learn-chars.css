@@ -9,6 +9,15 @@
   border: 1px solid #eee;
 }
 #learn-toolbar { margin-bottom: 1em; }
+/* 手机上让五个模式排成一行 */
+@media (max-width: 480px) {
+  #learn-toolbar { font-size: .9em; }
+  #learn-toolbar input { margin: 0 .1em; }
+  #learn-toolbar .label {
+    margin: auto .2em auto 0;
+    padding: .4em .5em;
+  }
+}
 #learn-answer {
   display: none;
   margin-bottom: 1em;
