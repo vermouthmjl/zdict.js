@@ -327,22 +327,26 @@ function modeChange(e) {
 }
 // 复习模式下把字集中的每个字都渲染出来，但默认是隐藏的
 function renderReview() {
-  var rs = d.querySelectorAll('.review'), lChars = learnedChars(key2);
+  var rs = d.querySelectorAll('.review'), lChars = learnedChars(key2), last = -1;
+  // 学过的字不一定排在最前面（比如看图练习只学有图的字），所以逐字检查
+  function seen(c) { return lChars.indexOf(c) >= 0; }
+  chars.forEach(function(c, i) { seen(c) && (last = i); });
   rs.forEach(function(el, i) {
-    i < lChars.length && el.classList.add('review-show');
+    seen(chars[i]) && el.classList.add('review-show');
   });
   if (rs.length >= chars.length) return;
   var all = d.classList.contains('review-all');
   chars.forEach(function(char, i) {
-    // 已经生成的字就表再生成了；若不显示所有的字，那么只生成学过的字
-    if (i < rs.length || (!all && i >= lChars.length)) return;
+    // 已经生成的字就表再生成了；若不显示所有的字，那么只生成到最后一个学过的字
+    if (i < rs.length || (!all && i > last)) return;
     var nb = cb.cloneNode(true), zi = nb.querySelector('.char');
     renderPinyin(char, zi, nb.querySelector('.pinyin'), '\n');
     zi.parentElement.addEventListener('click', function(e) {
       p[1] = i;
       renderChar(char);
     });
-    nb.classList.add('review', all ? 'review' : 'review-show');
+    nb.classList.add('review');
+    seen(char) && nb.classList.add('review-show');
     d.insertBefore(nb, cb);
   });
 }
