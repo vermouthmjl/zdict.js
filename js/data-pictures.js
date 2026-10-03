@@ -1,7 +1,12 @@
 // 可以用图画表示意思的字，供不识字的小朋友看图答题；有合适的 emoji 就用 emoji，否则用 SVG
 import svgs from "./data-svgs.js";
+import clozes from "./data-cloze.js";
 
-export default Object.assign({}, svgs, {
+// 没有图的字用填空卡：短语里的空格画成一个框，学习时再把字填进去
+var cards = {};
+for (var c in clozes) cards[c] = '<span class="cloze kai">' + clozes[c].replace('_', '<span class="blank"></span>') + '</span>';
+
+export default Object.assign(cards, svgs, {
 "零": "0️⃣", "一": "1️⃣", "二": "2️⃣", "三": "3️⃣", "四": "4️⃣", "五": "5️⃣",
 "六": "6️⃣", "七": "7️⃣", "八": "8️⃣", "九": "9️⃣", "十": "🔟", "百": "💯",
 "加": "➕", "减": "➖", "乘": "✖️", "除": "➗", "对": "✅", "错": "❌", "问": "❓",

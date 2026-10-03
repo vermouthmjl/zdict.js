@@ -71,6 +71,30 @@
   height: 1.5em;
   vertical-align: middle;
 }
+/* 填空卡：一句短语，空格是个橙色虚线框，填上字后字是橙色 */
+.cloze {
+  display: inline-block;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.2;
+}
+.choice.pic .cloze { font-size: .42em; }
+.char-pic .cloze { font-size: .45em; }
+.cloze .blank {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin: 0 .08em;
+  line-height: 1.1em;
+  vertical-align: -.2em;
+  border: .08em dashed #ff8c1a;
+  border-radius: .15em;
+  color: #ff8c1a;
+}
+.cloze .blank:not(:empty) {
+  border-style: solid;
+  background: #fff3e6;
+}
 .choice:hover { border-color: #888; }
 .choices.done .choice { cursor: default; }
 #learn-chars .choice.correct {
