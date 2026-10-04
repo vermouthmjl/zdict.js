@@ -93,7 +93,7 @@ export function next(page) {
   return page.$eval('.next', e => e.click());
 }
 
-// 一组字对应的选项标签（拼音或图）；看图选时只算有图的字
+// 一组字对应的选项标签（拼音或图）；选卡片时只算有图的字
 export function labelsOf(page, chars, pic) {
   return page.evaluate(async (chars, pic) => {
     const pics = (await import('/js/data-pictures.js')).default, zd = (await import('/js/zdict.js')).default;
@@ -105,6 +105,15 @@ export function labelsOf(page, chars, pic) {
 
 export function topChars(page, n) {
   return page.evaluate(async n => (await import('/js/data-freqs.js')).default.slice(0, n), n);
+}
+
+// 按字频排列、有卡片（图画或填空短语）的前 n 个字
+export function cardChars(page, n) {
+  return page.evaluate(async n => {
+    const pics = (await import('/js/data-pictures.js')).default;
+    const c = [...(await import('/js/data-freqs.js')).default].filter(c => pics[c]);
+    return n ? c.slice(0, n) : c;
+  }, n);
 }
 
 // 练习模式：当前处在哪一步（答题、已答、结束），以及进度圆点

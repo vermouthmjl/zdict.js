@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, openPage, choose, setRange, state, question, pick, next, labelsOf, topChars, blankOffsets, practice, practiceStep, storage, MODE, ANSWER } from './helpers.mjs';
+import { setup, openPage, choose, setRange, state, question, pick, next, labelsOf, topChars, cardChars, blankOffsets, practice, practiceStep, storage, MODE, ANSWER } from './helpers.mjs';
 
 describe('learn-chars game', () => {
   let env;
@@ -64,7 +64,9 @@ describe('learn-chars game', () => {
       const page = await openPage(env);
       await setRange(page, '', 500);
       await choose(page, mode, answer);
-      const allowed = new Set(await labelsOf(page, await topChars(page, 500), answer === ANSWER.picture));
+      // 选卡片时范围按有卡片的字来数
+      const pool = answer === ANSWER.picture ? await cardChars(page, 500) : await topChars(page, 500);
+      const allowed = new Set(await labelsOf(page, pool, answer === ANSWER.picture));
       for (let i = 0; i < 15; i++) {
         const q = await pick(page, false);
         const outside = q.options.filter(o => o !== q.right && !allowed.has(o));
@@ -144,7 +146,7 @@ describe('learn-chars game', () => {
     assert.equal(p.blank, '的');
   });
 
-  it('asks fill-in-the-blank cards in 看图选, with only other cards as wrong answers', async () => {
+  it('asks fill-in-the-blank cards in 选卡片, with only other cards as wrong answers', async () => {
     const page = await openPage(env);
     await setRange(page, '', 20);
     await choose(page, MODE.quiz, ANSWER.picture);
@@ -164,7 +166,7 @@ describe('learn-chars game', () => {
       if (q.cloze) assert.equal(await page.$eval('.choice.correct .blank', e => e.innerText), q.char);
       await next(page);
     }
-    const top = await topChars(page, 20), cl = await page.evaluate(async () => Object.keys((await import('/js/data-cloze.js')).default));
+    const top = await cardChars(page, 20), cl = await page.evaluate(async () => Object.keys((await import('/js/data-cloze.js')).default));
     assert.ok(asked.filter(c => cl.includes(c)).length >= 8, asked.join(''));
     assert.deepEqual(asked.filter(c => !top.includes(c)), []);
     assert.deepEqual(page.errors, []);
@@ -328,7 +330,7 @@ describe('learn-chars game', () => {
       assert.deepEqual(page.errors, []);
     });
 
-    it('practises only pictured chars with 看图选, never showing the picture beside the char', async () => {
+    it('practises only pictured chars with 选卡片, never showing the picture beside the char', async () => {
       const page = await openPage(env);
       await choose(page, MODE.practice, ANSWER.picture);
       await setRange(page, '水人也');
@@ -342,5 +344,64 @@ describe('learn-chars game', () => {
       assert.deepEqual(shown, ['人', '水']);
       assert.deepEqual(page.errors, []);
     });
+
+    it('caps the session size at the number of chars in the range', async () => {
+      const page = await openPage(env);
+      await choose(page, MODE.practice);
+      await page.evaluate(() => { document.querySelectorAll('#learn-settings input[type=number]')[2].value = 30; });
+      await setRange(page, '', 20);
+      const size = () => page.$eval('#learn-settings', e => {
+        const n = e.querySelectorAll('input[type=number]')[2];
+        return [+n.value, +n.max];
+      });
+      assert.deepEqual(await size(), [20, 20]);
+      assert.equal(Object.keys((await practice(page)).progress).length, 20);
+      await setRange(page, '', 8);
+      assert.deepEqual(await size(), [8, 8]);
+      assert.deepEqual(page.errors, []);
+    });
+
+    it('clears mastered and learned chars with 重新开始学习', async () => {
+      const page = await openPage(env);
+      await start(page);
+      await finish(page);
+      assert.equal((await storage(page, 'mastered-chars')).length, 5);
+      // 先取消一次，记录应该还在
+      await page.click('#learn-restart');
+      assert.equal((await storage(page, 'mastered-chars')).length, 5);
+      await page.evaluate(() => { window.confirm = () => true; });
+      await page.click('#learn-restart');
+      assert.equal(await storage(page, 'mastered-chars'), '');
+      assert.equal(await storage(page, 'learned-chars'), '');
+      const top = await topChars(page, 5), s = await practice(page);
+      assert.equal(s.stage, 'ask');
+      assert.deepEqual(Object.keys(s.progress), [...top]);
+      assert.deepEqual(page.errors, []);
+    });
+  });
+
+  it('shows and picks only chars with a card when answering with cards', async () => {
+    const page = await openPage(env);
+    const box = () => page.$eval('#learn-candidates', e => e.value);
+    const full = await box();
+    await choose(page, MODE.quiz, ANSWER.picture);
+    const cards = (await cardChars(page)).join('');
+    assert.equal(await box(), cards);
+    // 范围按有卡片的字来数：前 20 个都有卡片
+    await setRange(page, '', 20);
+    const asked = [];
+    for (let i = 0; i < 20; i++) { asked.push((await pick(page, true)).char); await next(page); }
+    assert.deepEqual(asked, [...cards.slice(0, 20)]);
+    // 换回打字，完整字库原样回来
+    await choose(page, MODE.quiz, ANSWER.type);
+    assert.equal(await box(), full);
+    // 自己填的字库：选卡片时只显示有卡片的字，但存的字库不变
+    await setRange(page, '水人也');
+    await choose(page, MODE.quiz, ANSWER.picture);
+    assert.equal(await box(), '人水');
+    assert.equal(await storage(page, 'candidate-chars'), '人水也');
+    await choose(page, MODE.quiz, ANSWER.pinyin);
+    assert.equal(await box(), '人水也');
+    assert.deepEqual(page.errors, []);
   });
 });

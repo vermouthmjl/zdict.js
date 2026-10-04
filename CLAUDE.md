@@ -15,7 +15,7 @@ Chinese character data scraped from 汉典 (zdic.net), plus two small browser ap
 
 ## How learn-chars.js works
 - Modes, chosen with radio buttons: 学习 (go through characters in order; seen characters are saved to localStorage `learned-chars`), 复习 (review learned characters as a grid), 测验 (go through the range in order), 挑战 (random draws plus a 95% CI estimate of how many characters the child knows).
-- Answer types for 测验 and 挑战: 打字 (type pinyin into a contenteditable), 选拼音 (pick from 4 pinyin options) or 看图选 (pick from 4 pictures; only characters that have a picture are asked).
+- Answer types for 测验, 挑战 and 练习: 打字 (type pinyin into a contenteditable; not offered in 练习), 选拼音 (pick from 4 pinyin options) or 选卡片 (pick from 4 cards, each a picture or a fill-in-the-blank phrase from `js/data-cloze.js`). With 选卡片 only characters that have a card are used, and the settings textbox shows only those.
 - Settings panel (the "密封线" box): a custom character list (localStorage `candidate-chars`), a start index and count within the frequency order, and an optional 韵母 filter.
 - State lives in module variables: `mode`, `answer`, the position array `p`, and the challenge counters `nc`/`nw`. `speak()` uses browser speechSynthesis with zh-CN.
 - Pictures show in 学习 and 复习 only, never in a quiz, because they would give away the answer.

@@ -33,7 +33,8 @@ if (d.childElementCount === 0) d.innerHTML = '<div id="learn-toolbar"></div>' +
   '<span>字；韵母（可选）：<input type="text" class="yunmu"></span></span> ' +
   '<span><span>练习：每轮</span> <input type="number" value="5" min="1"> ' +
   '<span>字，每字答对</span> <input type="number" value="3" min="1"> <span>次</span></span> ' +
-  '<button type="button" id="learn-set">确定</button></p>' +
+  '<button type="button" id="learn-set">确定</button> ' +
+  '<button type="button" id="learn-restart">重新开始学习</button></p>' +
   '<p class="seal-line seal-bottom">密封线内不要答题</p>';
 
 function sampleOne(x) {
@@ -70,7 +71,7 @@ tb.innerHTML || ['学习', '复习', '测验', '挑战', '练习'].forEach(funct
 });
 var mode = 0;
 
-// 测验、挑战模式下的答题方式：0 打字、1 选拼音、2 看图选
+// 测验、挑战、练习模式下的答题方式：0 打字、1 选拼音、2 选卡片（图画或填空短语）
 var answer = 0, NCHOICE = 4, picChars = Object.keys(pictures);
 var ab = d.querySelector('#learn-answer');
 if (!ab) {
@@ -79,7 +80,7 @@ if (!ab) {
   tb.after(ab);
 }
 ab.innerHTML || (ab.innerHTML = '<span class="answer-title">答题方式</span><span class="segmented">' +
-  ['打字', '选拼音', '看图选'].map(function(el, i) {
+  ['打字', '选拼音', '选卡片'].map(function(el, i) {
     return '<input name="answer" type="radio" id="answer-' + i + '" ' + (i === 0 ? 'checked' : '') +
       '/><label for="answer-' + i + '">' + el + '</label>';
   }).join('') + '</span>');
@@ -114,6 +115,12 @@ var S = {
 var key1 = 'candidate-chars';
 lc.value = S.get(key1);
 if (!lc.value) lc.value = zDict.freqs;
+// 完整字库；选卡片时文本框里只显示有卡片的字，但不改动这个字库
+var cands = lc.value;
+function hasCard(c) { return !!pictures[c]; }
+function shownCands() {
+  return answer === 2 ? cands.split('').filter(hasCard).join('') : cands;
+}
 
 // 保存学过的字，供复习用
 var key2 = 'learned-chars', p = [-1, 0, -1];
@@ -132,10 +139,13 @@ function learnedChars(key) {
 // sStep：-1 未开始、1 答题中、2 已答、3 一轮结束
 var key3 = 'mastered-chars', sChars = [], sCount = {}, sCur = '', sStep = -1, sK = 3;
 
-function setChars() {
+// keep 为真时保留学习记录（比如只是换了答题方式）
+function setChars(keep) {
   p = [-1, 0, -1];
-  chars = lc.value.split('');
-  if (lc.value !== '' && lc.value !== zDict.freqs) {
+  // 文本框没被改过就沿用完整字库，改过了就用新填的字
+  if (lc.value !== shownCands()) cands = lc.value;
+  chars = cands.split('');
+  if (cands !== '' && cands !== zDict.freqs) {
     var v = [];
     chars.forEach(function(x) {
       v.indexOf(x) === -1 && zDict.freqs.indexOf(x) >= 0 && v.push(x);
@@ -144,12 +154,15 @@ function setChars() {
     freqs.forEach(function(x) {
       v.indexOf(x) >= 0 && chars.push(x);
     });
-    lc.value = chars.join('');
-    S.set(key1, lc.value);
+    cands = chars.join('');
+    S.set(key1, cands);
   } else {
     S.remove(key1);
+    cands = zDict.freqs;
   }
   if (chars.length === 0) chars = freqs;
+  if (answer === 2) chars = chars.filter(hasCard);
+  lc.value = shownCands();
   var ym = ls.querySelector('input.yunmu').value;
   if (ym) chars = chars.filter(function(char) {
     var info = zDict.chars[char];
@@ -161,8 +174,13 @@ function setChars() {
   if (n[1] < 0) n1.value = n[1] = 0;
   // 特例：如果设定总共使用 0 个字符，那么选择所有字符
   if (n[1] > 0) chars = chars.slice(n[0] - 1, n[0] - 1 + n[1]);
+  // 练习每轮的字数不能超过范围内的字数
+  if (ns[2]) {
+    ns[2].max = Math.max(1, chars.length);
+    if (+ns[2].value > +ns[2].max) ns[2].value = ns[2].max;
+  }
   resetChallenge();
-  S.remove(key2);
+  keep || S.remove(key2);
   d.querySelectorAll('.review').forEach(removeEl); // 重新生成复习字块
   mode === 1 && renderReview();
 }
@@ -265,7 +283,7 @@ function renderMeaning(info) {
   mn.innerHTML = me;
 }
 
-// 看图选模式下只考有图的字
+// 选卡片时只考有卡片（图画或填空短语）的字
 function quizPool(x) {
   return answer === 2 ? x.filter(function(c) { return pictures[c]; }) : x;
 }
@@ -278,7 +296,7 @@ function notice(msg) {
   py.innerHTML = '<p style="font-size: .5em;">' + msg + '</p>';
 }
 function noPicChars() {
-  notice('当前字库里没有可以看图的字了，请换个字库或答题方式');
+  notice('当前字库里没有带卡片的字了，请换个字库或答题方式');
 }
 
 function pinyinOf(char) {
@@ -296,7 +314,7 @@ function shuffle(x) {
 function renderChoices(char) {
   var label = answer === 1 ? pinyinOf : function(c) { return pictures[c]; },
       right = label(char), opts = [right], pools = [chars, answer === 1 ? freqs : picChars];
-  // 看图选时干扰项先选同类（都是填空卡或都是图），免得一眼看出答案，不够时再混用
+  // 选卡片时干扰项先选同类（都是填空卡或都是图），免得一眼看出答案，不够时再混用
   if (answer === 2) pools = pools.map(function(x) {
     return x.filter(function(c) { return !clozes[c] === !clozes[char]; });
   }).concat(pools);
@@ -381,7 +399,7 @@ function modeChange(e) {
 // 复习模式下把字集中的每个字都渲染出来，但默认是隐藏的
 function renderReview() {
   var rs = d.querySelectorAll('.review'), lChars = learnedChars(key2), last = -1;
-  // 学过的字不一定排在最前面（比如看图练习只学有图的字），所以逐字检查
+  // 学过的字不一定排在最前面（比如选卡片练习只学有卡片的字），所以逐字检查
   function seen(c) { return lChars.indexOf(c) >= 0; }
   chars.forEach(function(c, i) { seen(c) && (last = i); });
   rs.forEach(function(el, i) {
@@ -475,7 +493,7 @@ function resetPractice() {
 function practiceNums() {
   // 每轮字数、每字需答对的次数（设置区里的后两个数字框）
   var ns = ls.querySelectorAll('input[type="number"]');
-  return [ns[2] ? Math.max(1, +ns[2].value || 5) : 5, ns[3] ? Math.max(1, +ns[3].value || 3) : 3];
+  return [ns[2] ? Math.min(Math.max(1, +ns[2].value || 5), chars.length) : 5, ns[3] ? Math.max(1, +ns[3].value || 3) : 3];
 }
 function startPractice() {
   var ms = learnedChars(key3), n = practiceNums();
@@ -543,8 +561,14 @@ function endPractice() {
 ab.addEventListener('mousedown', function(e) { e.preventDefault(); });
 function setAnswer(i) {
   ab.querySelector('#answer-' + i).checked = true;
+  var pic = answer === 2;
+  // 先记下文本框里的改动，再按新的答题方式显示字库
+  if (lc.value !== shownCands()) cands = lc.value;
   answer = i;
+  lc.value = shownCands();
   p[2] = -1;
+  // 换到或离开选卡片时，字库里有卡片的字才算数，所以重新选字
+  if (pic !== (i === 2)) return setChars(true);
   resetChallenge();
 }
 var typed = false;  // 进入练习模式时是否把打字换成了选拼音
@@ -567,6 +591,15 @@ d.querySelectorAll('input[name="answer"]').forEach(function(el) {
 
 // 重设字库
 ls.querySelector('#learn-set').addEventListener('click', function(e) {
+  S.remove(key2);
+  setChars();
+  renderChar();
+});
+
+// 清空练习学会的字和学习记录，从头再来
+ls.querySelector('#learn-restart').addEventListener('click', function(e) {
+  if (!confirm('清空学过和练会的字，从头开始？')) return;
+  S.remove(key3);
   S.remove(key2);
   setChars();
   renderChar();
