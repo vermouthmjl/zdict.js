@@ -1,4 +1,4 @@
-#learn-toolbar, .char-block { text-align: center; }
+#learn-toolbar, #learn-answer, .char-block { text-align: center; }
 .right { text-align: right; }
 #learn-toolbar .label {
   margin: auto 1em auto .5em;
@@ -8,7 +8,128 @@
   background: none;
   border: 1px solid #eee;
 }
-.pinyin { font-size: 3em; }
+#learn-toolbar { margin-bottom: 1em; }
+/* 手机上让五个模式排成一行 */
+@media (max-width: 480px) {
+  #learn-toolbar { font-size: .9em; }
+  #learn-toolbar input { margin: 0 .1em; }
+  #learn-toolbar .label {
+    margin: auto .2em auto 0;
+    padding: .4em .5em;
+  }
+}
+#learn-answer {
+  display: none;
+  margin-bottom: 1em;
+  font-size: .85em;
+}
+.quiz-pane #learn-answer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .6em;
+}
+.answer-title { color: #888; }
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f0f0f0;
+}
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented label {
+  padding: .3em 1em;
+  border-radius: 999px;
+  color: #666;
+  cursor: pointer;
+}
+.segmented input:checked + label {
+  background: white;
+  color: #000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+}
+.segmented input:focus-visible + label { outline: 2px solid #888; }
+.choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .8em;
+  max-width: 32em;
+  margin: 1em auto;
+}
+.choices:empty { display: none; }
+.choice {
+  font-size: 1.8em;
+  min-height: 2.5em;
+  padding: .3em;
+  border: 2px solid #ccc;
+  border-radius: .4em;
+  background: white;
+  cursor: pointer;
+}
+.choice.pic {
+  font-size: 3.5em;
+  line-height: 1.3;
+}
+.choice.pic svg {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
+}
+/* 填空卡：一句短语，空格是个橙色虚线框，填上字后字是橙色 */
+.cloze {
+  display: inline-block;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.2;
+}
+.choice.pic .cloze { font-size: .42em; }
+.char-pic .cloze { font-size: .45em; }
+.cloze .blank {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin: 0 .08em;
+  /* 框和字按同一条基线对齐：行高等于框高，字就在框里居中，和旁边的字一样高 */
+  line-height: 1.1em;
+  vertical-align: baseline;
+  text-align: center;
+  border: .08em dashed #ff8c1a;
+  border-radius: .15em;
+  color: #ff8c1a;
+}
+/* 空框里放一个看不见的全角空格，让空框和填了字的框基线一样 */
+.cloze .blank:empty::before { content: "\3000"; }
+.cloze .blank:not(:empty) {
+  border-style: solid;
+  background: #fff3e6;
+}
+.choice:hover { border-color: #888; }
+.choices.done .choice { cursor: default; }
+#learn-chars .choice.correct {
+  border-color: forestgreen;
+  background: #e6f4e6;
+}
+#learn-chars .choice.wrong {
+  border-color: orangered;
+  background: #fde8e0;
+}
+.choices .next {
+  grid-column: 1 / -1;
+  font-size: 1.4em;
+  padding: .4em;
+  cursor: pointer;
+}
+.pinyin {
+  font-size: 3em;
+  min-height: 1.2em;
+  line-height: 1.2em;
+  margin-bottom: .2em;
+}
 .py {
   font-size: 1.5em;
   margin-bottom: auto;
@@ -29,6 +150,20 @@
     repeating-linear-gradient(135deg, transparent, transparent calc(50% - .5px), lightgray calc(50% - .5px), lightgray calc(50% + .5px));
   position: relative;
   line-height: 1em;
+  vertical-align: middle;
+}
+.char-pic {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 5em;
+  line-height: 1;
+  margin-left: .3em;
+}
+.char-pic:empty, .review .char-pic { display: none; }
+.char-pic svg {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: middle;
 }
 .char-box > .char + span {
   position: absolute;
@@ -90,4 +225,61 @@
   color: #ccc;
   text-align: center;
   letter-spacing: 1em;
+}
+/* 练习模式：不能打字；进度圆点；结束页 */
+.practice-pane #answer-0 + label { display: none; }
+.practice-progress {
+  display: none;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .4em 1em;
+  margin-bottom: 1em;
+}
+.practice-pane .practice-progress:not(:empty) { display: flex; }
+.practice-over .practice-progress:not(:empty),
+.practice-over .char-block:not(.review) { display: none; }
+.pp {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: .2em .4em;
+  border-radius: .4em;
+  color: #888;
+}
+.pp .kai { font-size: 1.4em; line-height: 1.2; }
+.pp.now { color: #000; background: #f4f4f4; }
+.pp.done { color: forestgreen; }
+.pp .dots { display: inline-flex; gap: 3px; }
+.pp i {
+  width: .55em;
+  height: .55em;
+  border-radius: 50%;
+  border: 1px solid #bbb;
+}
+.pp i.on { background: forestgreen; border-color: forestgreen; }
+.practice-end { text-align: center; }
+.practice-end:empty { display: none; }
+.end-title { font-size: 1.6em; margin: .5em 0; }
+.end-chars {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .4em;
+}
+.end-chars button {
+  font: inherit;
+  font-size: 4em;
+  width: 1.4em;
+  height: 1.4em;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: .15em;
+  background: white;
+  cursor: pointer;
+}
+.practice-end .again {
+  font-size: 1.4em;
+  padding: .4em 1.5em;
+  margin: 1em 0;
+  cursor: pointer;
 }

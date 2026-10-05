@@ -4,7 +4,8 @@
   "description": "汉典网站数据（通用汉字、拼音、释义等）",
   "main": "js/zdict.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "echo 'Open http://localhost:8000/' && python3 -m http.server 8000",
+    "test": "node --test test/data.test.mjs test/game.test.mjs"
   },
   "repository": {
     "type": "git",
@@ -20,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/yihui/zdict.js/issues"
   },
-  "homepage": "https://github.com/yihui/zdict.js#readme"
+  "homepage": "https://github.com/yihui/zdict.js#readme",
+  "devDependencies": {
+    "puppeteer": "^23.11.1"
+  }
 }

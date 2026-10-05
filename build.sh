@@ -9,5 +9,5 @@ rollup pinyin-finals.js --format iife --file ../dist/pinyin-finals.js
 # rollup data-chars.js --format cjs --file ../dist/data-chars.js
 # rollup data-freqs.js --format cjs --file ../dist/data-freqs.js
 cd ..
-rm -r js/ R/ data/ *.Rproj
+rm -r js/ R/ data/ test/ index.html *.Rproj
 mv dist js
